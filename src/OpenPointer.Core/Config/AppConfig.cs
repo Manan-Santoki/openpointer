@@ -62,6 +62,9 @@ public sealed class GeneralSettings
 
     /// <summary>Warn when Logi Options+ is running, since it competes for the same controls.</summary>
     public bool WarnAboutOptionsPlus { get; set; } = true;
+
+    /// <summary>Look for new releases on GitHub in the background.</summary>
+    public bool CheckForUpdates { get; set; } = true;
 }
 
 /// <summary>Hardware settings. Null means "leave whatever the device has".</summary>

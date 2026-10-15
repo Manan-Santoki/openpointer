@@ -18,7 +18,26 @@ An open-source, customizable alternative to Logi Options+ for Windows. It talks 
 
 Any HID++ 2.0 mouse over a Bolt, Unifying or Lightspeed receiver, or Bluetooth. Features are discovered from the device, so options only appear when your mouse supports them. Verified on a Signature M650 L (Bolt).
 
-## Run
+## Install
+
+Download `OpenPointer-Setup-x.y.z.exe` from [Releases](https://github.com/Manan-Santoki/openpointer/releases/latest) and run it. It installs per user (no admin rights) and can start with Windows. A portable zip is also attached to every release.
+
+OpenPointer checks GitHub Releases for updates and installs them in one click from the tray or Settings. Downloads are verified against the release's `SHA256SUMS.txt`.
+
+The builds are not code-signed yet, so Windows SmartScreen may warn on first run ("More info" → "Run anyway").
+
+## Release
+
+Push a version tag; GitHub Actions tests, builds the installer and portable zip, and publishes the release:
+
+```
+git tag v0.3.0
+git push origin v0.3.0
+```
+
+Local installer build (Inno Setup 6.6+): `ISCC.exe /DAppVersion=0.3.0 installer\OpenPointer.iss` after publishing to `artifacts/publish`.
+
+## Run from source
 
 Requires the .NET 10 SDK.
 

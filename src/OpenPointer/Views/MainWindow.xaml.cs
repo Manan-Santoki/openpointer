@@ -41,6 +41,7 @@ public partial class MainWindow : Window
         Services.Devices.StateChanged += OnExternalChange;
         Services.Config.Changed += OnConfigChanged;
         ThemeManager.Changed += Render;
+        UpdateManager.Changed += Render;
         StateChanged += (_, _) =>
         {
             Frame.Margin = WindowState == WindowState.Maximized ? new Thickness(7) : new Thickness(0);
@@ -57,6 +58,7 @@ public partial class MainWindow : Window
             Services.Devices.StateChanged -= OnExternalChange;
             Services.Config.Changed -= OnConfigChanged;
             ThemeManager.Changed -= Render;
+            UpdateManager.Changed -= Render;
         };
         UpdateBanner();
         RenderNow();

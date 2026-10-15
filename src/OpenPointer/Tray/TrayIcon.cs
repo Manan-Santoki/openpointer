@@ -144,6 +144,8 @@ public sealed class TrayIcon : IDisposable
         }
 
         menu.Items.Add(new Separator());
+        if (UpdateManager.Available is { } update && !UpdateManager.Busy)
+            menu.Items.Add(Ui.MenuItem($"Install update {update.Version.ToString(3)}", () => _ = UpdateManager.InstallAsync()));
         menu.Items.Add(Ui.MenuItem("Open OpenPointer", App.ShowMainWindow));
         menu.Items.Add(Ui.MenuItem("Pause remapping", () => devices.Paused = !devices.Paused, devices.Paused));
         menu.Items.Add(Ui.MenuItem("Start with Windows", () => Autostart.Set(!Autostart.IsEnabled(), Services.ExecutablePath), Autostart.IsEnabled()));

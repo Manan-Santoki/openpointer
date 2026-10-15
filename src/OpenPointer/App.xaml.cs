@@ -35,6 +35,13 @@ public partial class App : Application
             return;
         }
 
+        if (e.Args.Contains("--quit"))
+        {
+            // Nothing is running, so there is nothing to quit.
+            Shutdown();
+            return;
+        }
+
         var dataDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "OpenPointer");
         Log.Initialize(dataDirectory);
         Log.Info($"OpenPointer {typeof(App).Assembly.GetName().Version} starting");
@@ -86,13 +93,11 @@ public partial class App : Application
             if (_quitEvent.WaitOne()) Dispatcher.BeginInvoke(Quit);
         }) { IsBackground = true, Name = "Quit signal" }.Start();
 
-        if (e.Args.Contains("--quit"))
-        {
-            Quit();
-            return;
-        }
-
         if (!e.Args.Contains("--background")) ShowMainWindow();
+
+        UpdateManager.Found += update => _tray?.Balloon($"OpenPointer {update.Version.ToString(3)} is available",
+            "Open the tray menu or Settings to install it.");
+        UpdateManager.Start();
 
         if (config.Current.General.WarnAboutOptionsPlus && OptionsPlus.IsRunning())
             _tray.Balloon("Logi Options+ is running", "It overrides button remapping. Stop it from the tray menu.");

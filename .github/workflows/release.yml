@@ -1,0 +1,75 @@
+name: Release
+
+# Push a tag like v0.3.0 to build, test and publish a release:
+#   git tag v0.3.0 && git push origin v0.3.0
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+
+env:
+  INNO_VERSION: 6.7.3
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Version from tag
+        id: version
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Tag must look like v1.2.3, got ${{ github.ref_name }}" }
+          "value=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Test
+        run: dotnet test tests/OpenPointer.Tests -c Release
+
+      - name: Publish
+        run: >
+          dotnet publish src/OpenPointer -c Release -r win-x64 --self-contained true
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none
+          -p:Version=${{ steps.version.outputs.value }}
+          -o artifacts/publish
+
+      - name: Install Inno Setup ${{ env.INNO_VERSION }}
+        shell: pwsh
+        run: |
+          $tag = "is-" + $env:INNO_VERSION.Replace('.', '_')
+          $installer = "$env:RUNNER_TEMP\innosetup.exe"
+          Invoke-WebRequest "https://github.com/jrsoftware/issrc/releases/download/$tag/innosetup-$env:INNO_VERSION.exe" -OutFile $installer
+          Start-Process $installer -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/DIR=$env:RUNNER_TEMP\inno" -Wait
+          "$env:RUNNER_TEMP\inno" >> $env:GITHUB_PATH
+
+      - name: Build installer
+        run: ISCC.exe /Q /DAppVersion=${{ steps.version.outputs.value }} installer\OpenPointer.iss
+
+      - name: Portable zip and checksums
+        shell: pwsh
+        run: |
+          $v = "${{ steps.version.outputs.value }}"
+          Compress-Archive -Path artifacts/publish/* -DestinationPath "artifacts/OpenPointer-$v-portable.zip"
+          $files = Get-ChildItem artifacts -File | Where-Object { $_.Name -like "OpenPointer-*" }
+          $files | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name } |
+            Set-Content -Path artifacts/SHA256SUMS.txt -Encoding ascii
+          Get-Content artifacts/SHA256SUMS.txt
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $v = "${{ steps.version.outputs.value }}"
+          gh release create "${{ github.ref_name }}" `
+            "artifacts/OpenPointer-Setup-$v.exe" `
+            "artifacts/OpenPointer-$v-portable.zip" `
+            "artifacts/SHA256SUMS.txt" `
+            --title "OpenPointer $v" --generate-notes

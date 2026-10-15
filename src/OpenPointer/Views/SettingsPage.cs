@@ -55,6 +55,19 @@ public sealed class SettingsPage(MainWindow window) : IPage
                 Ui.Switch(config.General.WarnAboutOptionsPlus, on => Services.Config.Update(c => c.General.WarnAboutOptionsPlus = on))),
         ]));
 
+        page.Children.Add(Ui.Section("Updates"));
+        var updateAction = UpdateManager.Available is { } update
+            ? Ui.Button($"Install {update.Version.ToString(3)}", () => _ = UpdateManager.InstallAsync(), "PrimaryButton")
+            : Ui.Button("Check now", () => _ = UpdateManager.CheckAsync(userInitiated: true));
+        updateAction.IsEnabled = !UpdateManager.Busy;
+        var updateStatus = UpdateManager.Status.Length > 0 ? UpdateManager.Status : "Updates come from GitHub Releases and are checksum-verified.";
+        page.Children.Add(Ui.Card(
+        [
+            Ui.Row($"Version {UpdateManager.Current.ToString(3)}", updateStatus, updateAction),
+            Ui.Row("Check automatically", "Look for a new version every few hours",
+                Ui.Switch(config.General.CheckForUpdates, on => Services.Config.Update(c => c.General.CheckForUpdates = on))),
+        ]));
+
         page.Children.Add(Ui.Section("Configuration", "Everything is stored in one JSON file. Edits are picked up as soon as you save."));
         var path = Ui.Text(Services.Config.FilePath, "Caption");
         path.FontFamily = (FontFamily)Application.Current.FindResource("Mono");
