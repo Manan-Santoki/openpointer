@@ -50,6 +50,12 @@ public static class DocsCapture
             await Task.Delay(200);
         }
 
+        _ = window.Dispatcher.BeginInvoke(() => Dialogs.AskLaunchApp(window));
+        await Task.Delay(2500);
+        Save(window, Path.Combine(directory, "dialog-apps.png"));
+        window.CloseDialogs();
+        await Task.Delay(200);
+
         window.Close();
         devices.Dispose();
         Application.Current.Shutdown();

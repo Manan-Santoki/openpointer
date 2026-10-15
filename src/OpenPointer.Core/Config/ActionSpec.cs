@@ -86,8 +86,12 @@ public sealed record ScrollAction(int Amount, bool Horizontal = false) : ActionS
 /// <summary>Starts a program, opens a file or folder, or opens a URL.</summary>
 public sealed record LaunchAction(string Target, string? Arguments = null, string? WorkingDirectory = null) : ActionSpec
 {
+    /// <summary>Display name, e.g. "WhatsApp" for a Store app whose target is an app ID.</summary>
+    public string? Name { get; init; }
+
     public override string Describe()
     {
+        if (!string.IsNullOrWhiteSpace(Name)) return $"Open {Name}";
         var name = Path.GetFileNameWithoutExtension(Target.TrimEnd('\\', '/'));
         return $"Open {(name.Length > 0 ? name : Target)}";
     }

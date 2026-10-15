@@ -6,6 +6,17 @@ Each release's notes on GitHub are taken from its section here, so add an entry 
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-15
+
+### Added
+- **Open app…** lists every app in the Start menu, including Microsoft Store apps like WhatsApp and Spotify, with icons and search. Store apps open by their app ID, so the action keeps working after the app updates and its install folder changes.
+- **Browse…** in the same dialog opens any other program, script or portable app.
+- Search in the **Add application** picker. Type to filter; Enter picks the first match.
+
+### Changed
+- "Open app or file…" is now two actions: **Open app…** and **Open file or folder…**.
+- Open-app actions show the app's name, for example "Open WhatsApp".
+
 ## [0.5.1] - 2026-10-15
 
 ### Fixed
@@ -128,7 +139,8 @@ First build (not published as a release).
 - Fails safe: buttons are remapped only while OpenPointer runs.
 - Detects Logi Options+ and offers to stop it.
 
-[Unreleased]: https://github.com/Manan-Santoki/openpointer/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/Manan-Santoki/openpointer/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/Manan-Santoki/openpointer/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/Manan-Santoki/openpointer/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/Manan-Santoki/openpointer/compare/v0.4.4...v0.5.0
 [0.4.4]: https://github.com/Manan-Santoki/openpointer/compare/v0.4.2...v0.4.4

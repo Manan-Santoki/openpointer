@@ -367,12 +367,12 @@ public sealed class ActionRunner
 
     private static void Launch(LaunchAction launch)
     {
-        var info = new ProcessStartInfo
-        {
-            FileName = Environment.ExpandEnvironmentVariables(launch.Target),
-            Arguments = launch.Arguments ?? "",
-            UseShellExecute = true,
-        };
+        var target = Environment.ExpandEnvironmentVariables(launch.Target);
+        // Start menu apps (including Microsoft Store apps) launch through the shell by app ID,
+        // which keeps working when the app updates and its install folder changes.
+        var info = Platform.InstalledApps.IsAppsFolderTarget(target)
+            ? new ProcessStartInfo("explorer.exe", $"\"{target}\"") { UseShellExecute = true }
+            : new ProcessStartInfo { FileName = target, Arguments = launch.Arguments ?? "", UseShellExecute = true };
         if (!string.IsNullOrWhiteSpace(launch.WorkingDirectory))
             info.WorkingDirectory = Environment.ExpandEnvironmentVariables(launch.WorkingDirectory);
         Process.Start(info)?.Dispose();

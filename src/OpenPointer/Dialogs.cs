@@ -421,6 +421,127 @@ public static class Dialogs
         return picker.ShowDialog(owner) == true ? picker.FileName : null;
     }
 
+    /// <summary>A search box that filters rows as you type; Enter picks the first visible row.</summary>
+    private static TextBox SearchBox(StackPanel rows, Func<FrameworkElement, string> textOf, Action<FrameworkElement> pickFirst)
+    {
+        var search = new TextBox { Margin = new Thickness(0, 0, 0, 12) };
+        var hint = Ui.Text("Search", "MutedText");
+        hint.IsHitTestVisible = false;
+        hint.Margin = new Thickness(10, 0, 0, 0);
+        hint.VerticalAlignment = VerticalAlignment.Center;
+        search.Loaded += (_, _) =>
+        {
+            // Placeholder drawn over the box until the user types.
+            if (System.Windows.Documents.AdornerLayer.GetAdornerLayer(search) is { } layer) layer.Add(new HintAdorner(search, hint));
+        };
+        search.TextChanged += (_, _) =>
+        {
+            var terms = search.Text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            foreach (FrameworkElement row in rows.Children)
+                row.Visibility = terms.All(t => textOf(row).Contains(t, StringComparison.CurrentCultureIgnoreCase))
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+            hint.Visibility = search.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+        };
+        search.PreviewKeyDown += (_, e) =>
+        {
+            if (e.Key != Key.Enter) return;
+            if (rows.Children.OfType<FrameworkElement>().FirstOrDefault(r => r.Visibility == Visibility.Visible) is { } first)
+            {
+                e.Handled = true;
+                pickFirst(first);
+            }
+        };
+        return search;
+    }
+
+    private sealed class HintAdorner(UIElement adorned, UIElement hint) : System.Windows.Documents.Adorner(adorned)
+    {
+        protected override int VisualChildrenCount => 1;
+
+        protected override Visual GetVisualChild(int index) => hint;
+
+        protected override Size MeasureOverride(Size constraint)
+        {
+            hint.Measure(constraint);
+            return AdornedElement.RenderSize;
+        }
+
+        protected override Size ArrangeOverride(Size finalSize)
+        {
+            hint.Arrange(new Rect(new Point(2, 0), AdornedElement.RenderSize));
+            return finalSize;
+        }
+    }
+
+    /// <summary>
+    /// Picks an app to open: everything in the Start menu (desktop and Microsoft Store apps), with
+    /// search, or any file via Browse. Store apps launch by app ID, so updates don't break them.
+    /// </summary>
+    public static LaunchAction? AskLaunchApp(Window? owner)
+    {
+        var rows = new StackPanel();
+        LaunchAction? result = null;
+        DialogHost? dialog = null;
+
+        foreach (var app in Platform.InstalledApps.List())
+        {
+            var row = new Grid();
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(32) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            var icon = new Image { Width = 20, Height = 20, HorizontalAlignment = HorizontalAlignment.Left };
+            row.Children.Add(icon);
+            var name = Ui.Text(app.Name, "Label");
+            Grid.SetColumn(name, 1);
+            row.Children.Add(name);
+
+            var button = new Button
+            {
+                Style = Ui.Style("GhostButton"),
+                Content = row,
+                Height = 40,
+                Padding = new Thickness(10, 0, 10, 0),
+                HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                FontWeight = FontWeights.Normal,
+                Tag = app.Name,
+            };
+            var chosen = app;
+            button.Click += (_, _) =>
+            {
+                result = new LaunchAction(chosen.LaunchTarget) { Name = chosen.Name };
+                dialog!.DialogResult = true;
+            };
+            // Load icons after the list is on screen so the dialog opens instantly.
+            button.Loaded += (_, _) =>
+            {
+                if (icon.Source != null) return;
+                Application.Current.Dispatcher.BeginInvoke(() => icon.Source = AppIcons.For(chosen.LaunchTarget),
+                    System.Windows.Threading.DispatcherPriority.Background);
+            };
+            rows.Children.Add(button);
+        }
+
+        var search = SearchBox(rows, row => (string)row.Tag, row => ((Button)row).RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent)));
+        var list = new ScrollViewer { Content = rows, MaxHeight = 380, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        var frame = new Border { Style = Ui.Style("Card"), Padding = new Thickness(4), Child = list };
+        var body = new DockPanel();
+        DockPanel.SetDock(search, Dock.Top);
+        body.Children.Add(search);
+        body.Children.Add(frame);
+
+        dialog = new DialogHost("Open an app", "Includes Microsoft Store apps. Use Browse for anything else, like a script or a portable app.", body, 520);
+        dialog.AddButton("Browse…", false, () =>
+        {
+            var path = AskExecutable(dialog.HostWindow);
+            if (path == null) return;
+            result = new LaunchAction(path);
+            dialog.DialogResult = true;
+        });
+        dialog.AddButton("Cancel", false, dialog.Close);
+        dialog.Loaded += (_, _) => search.Focus();
+        return dialog.ShowFor(owner) ? result : null;
+    }
+
     public sealed record AppChoice(string Match, string Name, string? ExecutablePath);
 
     /// <summary>Lets the user pick a running app, the desktop, the taskbar, or browse for an .exe.</summary>
@@ -458,6 +579,7 @@ public static class Dialogs
                 Padding = new Thickness(10, 0, 10, 0),
                 HorizontalContentAlignment = HorizontalAlignment.Stretch,
                 FontWeight = FontWeights.Normal,
+                Tag = $"{choice.Name} {choice.Match}",
             };
             button.Click += (_, _) =>
             {
@@ -475,10 +597,16 @@ public static class Dialogs
         foreach (var app in RunningApps().Where(a => !excluded.Contains(a.Match) && a.Match != "explorer.exe"))
             Add(app, Ui.ExecutableIcon(app.ExecutablePath), null);
 
+        var search = SearchBox(list, row => (string)row.Tag, row => ((Button)row).RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent)));
         var scroller = new ScrollViewer { Content = list, MaxHeight = 360, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         var frame = new Border { Style = Ui.Style("Card"), Padding = new Thickness(4), Child = scroller };
+        var body = new DockPanel();
+        DockPanel.SetDock(search, Dock.Top);
+        body.Children.Add(search);
+        body.Children.Add(frame);
 
-        dialog = new DialogHost("Add application", "Pick a running app. Its profile switches on when the app is focused.", frame, 480);
+        dialog = new DialogHost("Add application", "Pick a running app. Its profile switches on when the app is focused.", body, 480);
+        dialog.Loaded += (_, _) => search.Focus();
         dialog.AddButton("Browse…", false, () =>
         {
             var path = AskExecutable(dialog.HostWindow);

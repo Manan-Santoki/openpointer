@@ -67,11 +67,18 @@ public static class ActionMenu
             if (chord != null) pick(new KeysAction(chord));
         }, isCustomKeys, isCustomKeys ? ((KeysAction)current).Describe() : null));
 
-        target.Items.Add(Ui.MenuItem("Open app or file…", () =>
+        var opensApp = current is LaunchAction l && !IsUrl(l.Target);
+        target.Items.Add(Ui.MenuItem("Open app…", () =>
+        {
+            var app = Dialogs.AskLaunchApp(ownerResolver?.Invoke());
+            if (app != null) pick(app);
+        }, opensApp, opensApp ? ((LaunchAction)current).Describe()[5..] : "Includes Store apps"));
+
+        target.Items.Add(Ui.MenuItem("Open file or folder…", () =>
         {
             var path = Dialogs.AskExecutable(ownerResolver?.Invoke());
             if (path != null) pick(new LaunchAction(path));
-        }, current is LaunchAction l && !IsUrl(l.Target), current is LaunchAction l2 && !IsUrl(l2.Target) ? l2.Describe()[5..] : null));
+        }));
 
         target.Items.Add(Ui.MenuItem("Open website…", () =>
         {
