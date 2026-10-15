@@ -69,7 +69,7 @@ public partial class MainWindow : Window
             Draft.Changed -= OnDraftChanged;
         };
         UpdateBanner();
-        SaveBar.Visibility = Draft.IsDirty ? Visibility.Visible : Visibility.Collapsed;
+        ShowSaveBar(Draft.IsDirty);
         RenderNow();
     }
 
@@ -200,8 +200,26 @@ public partial class MainWindow : Window
 
     private void OnDraftChanged()
     {
-        SaveBar.Visibility = Draft.IsDirty ? Visibility.Visible : Visibility.Collapsed;
+        ShowSaveBar(Draft.IsDirty);
         Render();
+    }
+
+    /// <summary>Slides the floating save bar in or out and keeps page content clear of it.</summary>
+    private void ShowSaveBar(bool show)
+    {
+        PageHost.Margin = new Thickness(40, 4, 40, show ? 112 : 40);
+        if (show == (SaveBar.Visibility == Visibility.Visible)) return;
+        if (!show)
+        {
+            SaveBar.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        SaveBar.Visibility = Visibility.Visible;
+        var ease = new System.Windows.Media.Animation.CubicEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut };
+        SaveBarOffset.BeginAnimation(System.Windows.Media.TranslateTransform.YProperty,
+            new System.Windows.Media.Animation.DoubleAnimation(24, 0, TimeSpan.FromMilliseconds(180)) { EasingFunction = ease });
+        SaveBar.BeginAnimation(OpacityProperty, new System.Windows.Media.Animation.DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(180)));
     }
 
     private void OnSave(object sender, RoutedEventArgs e) => Draft.Save();

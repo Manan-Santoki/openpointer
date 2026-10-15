@@ -53,7 +53,6 @@
                     <RowDefinition Height="40" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" WindowChrome.IsHitTestVisibleInChrome="True">
@@ -80,27 +79,34 @@
                     </Grid>
                 </Border>
 
-                <!-- Unsaved changes -->
-                <Border x:Name="SaveBar" Grid.Row="3" BorderBrush="{DynamicResource Border}" BorderThickness="0,1,0,0"
-                        Background="{DynamicResource Background}" Padding="40,12" Visibility="Collapsed">
-                    <Grid MaxWidth="760">
+                <ScrollViewer x:Name="Scroller" Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
+                    <ContentControl x:Name="PageHost" Margin="40,4,40,40" MaxWidth="760" HorizontalAlignment="Stretch" Focusable="False" />
+                </ScrollViewer>
+
+                <!-- Unsaved changes: floating bar over the page -->
+                <Border x:Name="SaveBar" Grid.Row="2" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="40,0,40,24"
+                        MaxWidth="640" MinWidth="480" Padding="20,12,12,12" CornerRadius="12" BorderThickness="1"
+                        BorderBrush="{DynamicResource Border}" Background="{DynamicResource Muted}" Visibility="Collapsed">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="28" ShadowDepth="8" Direction="270" Opacity="0.45" Color="Black" />
+                    </Border.Effect>
+                    <Border.RenderTransform>
+                        <TranslateTransform x:Name="SaveBarOffset" Y="0" />
+                    </Border.RenderTransform>
+                    <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <StackPanel VerticalAlignment="Center">
+                        <StackPanel VerticalAlignment="Center" Margin="0,0,24,0">
                             <TextBlock Text="Unsaved changes" Style="{StaticResource Label}" />
                             <TextBlock Text="Buttons keep their current behavior until you save." Style="{StaticResource Caption}" Margin="0,2,0,0" />
                         </StackPanel>
-                        <Button Grid.Column="1" Content="Discard" Click="OnDiscard" MinWidth="88" />
-                        <Button Grid.Column="2" Content="Save" Click="OnSave" Style="{StaticResource PrimaryButton}" MinWidth="88" Margin="8,0,0,0" />
+                        <Button Grid.Column="1" Content="Discard" Click="OnDiscard" MinWidth="84" Style="{StaticResource GhostButton}" />
+                        <Button Grid.Column="2" Content="Save" Click="OnSave" Style="{StaticResource PrimaryButton}" MinWidth="84" Margin="6,0,0,0" />
                     </Grid>
                 </Border>
-
-                <ScrollViewer x:Name="Scroller" Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
-                    <ContentControl x:Name="PageHost" Margin="40,4,40,40" MaxWidth="760" HorizontalAlignment="Stretch" Focusable="False" />
-                </ScrollViewer>
             </Grid>
         </Grid>
 
