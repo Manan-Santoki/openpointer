@@ -39,6 +39,42 @@ public static partial class CursorThemes
         ["Person"] = @"%SystemRoot%\cursors\aero_person.cur",
     };
 
+    /// <summary>Friendly names Windows uses for each role (Mouse settings, Pointers tab).</summary>
+    public static readonly Dictionary<string, string> RoleLabels = new()
+    {
+        ["Arrow"] = "Normal select",
+        ["Help"] = "Help select",
+        ["AppStarting"] = "Working in background",
+        ["Wait"] = "Busy",
+        ["Crosshair"] = "Precision select",
+        ["IBeam"] = "Text select",
+        ["NWPen"] = "Handwriting",
+        ["No"] = "Unavailable",
+        ["SizeNS"] = "Vertical resize",
+        ["SizeWE"] = "Horizontal resize",
+        ["SizeNWSE"] = "Diagonal resize 1",
+        ["SizeNESW"] = "Diagonal resize 2",
+        ["SizeAll"] = "Move",
+        ["UpArrow"] = "Alternate select",
+        ["Hand"] = "Link select",
+        ["Pin"] = "Location select",
+        ["Person"] = "Person select",
+    };
+
+    /// <summary>The Windows default file for a role, expanded; empty for roles drawn from built-in resources.</summary>
+    public static string DefaultFile(string role) =>
+        WindowsDefault.TryGetValue(role, out var path) ? Environment.ExpandEnvironmentVariables(path) : "";
+
+    /// <summary>The currently active scheme name ("" when Windows uses its built-in cursors).</summary>
+    public static string ActiveSchemeName
+    {
+        get
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(CursorsKey);
+            return key?.GetValue("") as string ?? "";
+        }
+    }
+
     public static string DataDirectory { get; set; } =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "OpenPointer");
 

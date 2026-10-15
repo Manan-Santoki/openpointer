@@ -3,7 +3,7 @@ using OpenPointer.Config;
 namespace OpenPointer.App;
 
 /// <summary>
-/// Unsaved profile edits made in the settings window. Pages read and write the draft; Save commits
+/// Unsaved edits made in the settings window (profiles and cursor style). Pages read and write the draft; Save commits
 /// its profiles to config.json, Discard reverts. Device and app settings stay instant, and so does
 /// the tray menu, which writes straight to the config.
 /// </summary>
@@ -39,8 +39,19 @@ public static class Draft
     public static void Save()
     {
         if (!IsDirty) return;
-        var profiles = Clone(Current).Profiles;
-        Services.Config.Update(config => config.Profiles = profiles);
+        var draft = Clone(Current);
+        var applied = Services.Config.Current.General;
+        var cursorChanged = draft.General.CursorTheme != applied.CursorTheme ||
+                            draft.General.CursorShadow != applied.CursorShadow ||
+                            draft.General.CursorSize != applied.CursorSize;
+        Services.Config.Update(config =>
+        {
+            config.Profiles = draft.Profiles;
+            config.General.CursorTheme = draft.General.CursorTheme;
+            config.General.CursorShadow = draft.General.CursorShadow;
+            config.General.CursorSize = draft.General.CursorSize;
+        });
+        if (cursorChanged) CursorManager.Apply(Services.Config.Current.General);
         Reset(Services.Config.Current);
         Changed?.Invoke();
     }
@@ -59,7 +70,13 @@ public static class Draft
 
     private static AppConfig Clone(AppConfig config) => ConfigStore.Parse(ConfigStore.Serialize(config));
 
-    // Only profiles are drafted; device and general settings apply immediately elsewhere.
+    // Profiles and the cursor style are drafted; other settings apply immediately.
     private static string Snapshot(AppConfig config) =>
-        System.Text.Json.JsonSerializer.Serialize(config.Profiles, ConfigStore.JsonOptions);
+        System.Text.Json.JsonSerializer.Serialize(new
+        {
+            config.Profiles,
+            config.General.CursorTheme,
+            config.General.CursorShadow,
+            config.General.CursorSize,
+        }, ConfigStore.JsonOptions);
 }

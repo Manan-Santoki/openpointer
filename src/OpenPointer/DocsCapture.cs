@@ -32,7 +32,7 @@ public static class DocsCapture
         var height = int.TryParse(Environment.GetEnvironmentVariable("OPENPOINTER_CAPTURE_HEIGHT"), out var h) ? h : 720;
         var window = new MainWindow { Width = 1080, Height = height, ShowActivated = false, Left = -20000, Top = 0 };
         window.Show();
-        foreach (var (page, file) in new[] { ("Buttons", "buttons"), ("Pointer", "pointer"), ("Apps", "applications"), ("Settings", "settings") })
+        foreach (var (page, file) in new[] { ("Buttons", "buttons"), ("Pointer", "pointer"), ("Cursors", "cursors"), ("Apps", "applications"), ("Settings", "settings") })
         {
             window.Navigate(page);
             await Task.Delay(500);

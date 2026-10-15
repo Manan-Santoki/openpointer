@@ -14,6 +14,7 @@ public partial class MainWindow : Window
     private readonly ButtonsPage _buttons;
     private readonly PointerPage _pointer;
     private readonly ApplicationsPage _apps;
+    private readonly CursorsPage _cursors;
     private readonly SettingsPage _settings;
     private IPage _page;
 
@@ -25,6 +26,7 @@ public partial class MainWindow : Window
         _buttons = new ButtonsPage(this);
         _pointer = new PointerPage(this);
         _apps = new ApplicationsPage(this);
+        _cursors = new CursorsPage(this);
         _settings = new SettingsPage(this);
         _page = _buttons;
 
@@ -102,7 +104,7 @@ public partial class MainWindow : Window
     /// <summary>Switches page by name ("Buttons", "Pointer", "Apps", "Settings").</summary>
     public void Navigate(string page)
     {
-        var target = page switch { "Pointer" => NavPointer, "Apps" => NavApps, "Settings" => NavSettings, _ => NavButtons };
+        var target = page switch { "Pointer" => NavPointer, "Cursors" => NavCursors, "Apps" => NavApps, "Settings" => NavSettings, _ => NavButtons };
         target.IsChecked = true;
         RenderNow();
     }
@@ -110,7 +112,8 @@ public partial class MainWindow : Window
     private void OnNavigate(object sender, RoutedEventArgs e)
     {
         if (_buttons == null) return; // during InitializeComponent
-        _page = sender == NavPointer ? _pointer : sender == NavApps ? _apps : sender == NavSettings ? _settings : _buttons;
+        _page = sender == NavPointer ? _pointer : sender == NavCursors ? _cursors : sender == NavApps ? _apps
+            : sender == NavSettings ? _settings : _buttons;
         PageHost.Content = _page.Render();
         Scroller.ScrollToTop();
     }
