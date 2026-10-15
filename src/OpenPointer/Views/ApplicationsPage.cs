@@ -10,7 +10,7 @@ public sealed class ApplicationsPage(MainWindow window) : IPage
 {
     public FrameworkElement Render()
     {
-        var config = Services.Config.Current;
+        var config = Draft.Current;
         var page = new StackPanel();
         var add = Ui.Button("Add application", () =>
         {
@@ -62,7 +62,7 @@ public sealed class ApplicationsPage(MainWindow window) : IPage
         var actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         if (!isDefault)
         {
-            var toggle = Ui.Switch(profile.Enabled, on => Services.Config.Update(c => c.Profiles[index].Enabled = on));
+            var toggle = Ui.Switch(profile.Enabled, on => Draft.Edit(c => c.Profiles[index].Enabled = on));
             toggle.Margin = new Thickness(0, 0, 12, 0);
             toggle.ToolTip = profile.Enabled ? "Profile is on" : "Profile is off";
             actions.Children.Add(toggle);
@@ -80,13 +80,13 @@ public sealed class ApplicationsPage(MainWindow window) : IPage
     private ContextMenu MoreMenu(FrameworkElement anchor, int index, bool isDefault)
     {
         var menu = new ContextMenu { PlacementTarget = anchor, Placement = PlacementMode.Bottom };
-        var profile = Services.Config.Current.Profiles[index];
+        var profile = Draft.Current.Profiles[index];
         if (!isDefault)
         {
             menu.Items.Add(Ui.MenuItem("Rename…", () =>
             {
                 var name = Dialogs.AskText(window, "Rename profile", "Shown in the tray menu and here.", profile.Name);
-                if (name != null) Services.Config.Update(c => c.Profiles[index].Name = name.Trim());
+                if (name != null) Draft.Edit(c => c.Profiles[index].Name = name.Trim());
             }));
         }
 
@@ -96,11 +96,11 @@ public sealed class ApplicationsPage(MainWindow window) : IPage
                 "DPI to use while this profile is active. Leave empty to use the device setting.", profile.Dpi?.ToString() ?? "");
             if (text == null) return;
             var dpi = int.TryParse(text.Trim(), out var value) && value > 0 ? value : (int?)null;
-            Services.Config.Update(c => c.Profiles[index].Dpi = dpi);
+            Draft.Edit(c => c.Profiles[index].Dpi = dpi);
         }, hint: profile.Dpi != null ? $"{profile.Dpi}" : null));
 
         if (profile.Dpi != null)
-            menu.Items.Add(Ui.MenuItem("Use device pointer speed", () => Services.Config.Update(c => c.Profiles[index].Dpi = null)));
+            menu.Items.Add(Ui.MenuItem("Use device pointer speed", () => Draft.Edit(c => c.Profiles[index].Dpi = null)));
 
         if (!isDefault)
         {
@@ -108,7 +108,7 @@ public sealed class ApplicationsPage(MainWindow window) : IPage
             menu.Items.Add(Ui.MenuItem("Remove", () =>
             {
                 if (Dialogs.Confirm(window, $"Remove {profile.Name}?", "Its buttons go back to the All applications settings.", "Remove"))
-                    Services.Config.Update(c => c.Profiles.RemoveAt(index));
+                    Draft.Edit(c => c.Profiles.RemoveAt(index));
             }));
         }
 
@@ -132,11 +132,11 @@ public sealed class ApplicationsPage(MainWindow window) : IPage
     /// <summary>Asks for an app and creates its profile. Returns the new (or existing) profile index.</summary>
     public static int? AddApplication(Window owner)
     {
-        var existing = Services.Config.Current.Profiles.Skip(1).SelectMany(p => p.Match).ToList();
+        var existing = Draft.Current.Profiles.Skip(1).SelectMany(p => p.Match).ToList();
         var choice = Dialogs.AskApplication(owner, existing);
         if (choice == null) return null;
         var index = -1;
-        Services.Config.Update(c =>
+        Draft.Edit(c =>
         {
             c.Profiles.Add(new Profile { Name = choice.Name, Match = [choice.Match], ExecutablePath = choice.ExecutablePath });
             index = c.Profiles.Count - 1;

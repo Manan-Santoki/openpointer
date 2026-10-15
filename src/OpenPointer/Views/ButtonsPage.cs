@@ -13,7 +13,7 @@ public sealed class ButtonsPage(MainWindow window) : IPage
 
     public FrameworkElement Render()
     {
-        var config = Services.Config.Current;
+        var config = Draft.Current;
         if (ProfileIndex >= config.Profiles.Count) ProfileIndex = 0;
         var profile = config.Profiles[ProfileIndex];
         var isDefault = ProfileIndex == 0;
@@ -58,7 +58,7 @@ public sealed class ButtonsPage(MainWindow window) : IPage
 
         page.Children.Add(Ui.Card(rows));
         var note = Ui.Text(mouse.Online
-            ? "Changes apply instantly. Buttons return to normal when OpenPointer quits."
+            ? "Save to apply your changes. Buttons return to normal when OpenPointer quits."
             : $"{mouse.Name} is asleep. Changes apply when it wakes up.", "Caption");
         note.TextWrapping = TextWrapping.Wrap;
         page.Children.Add(note);
@@ -163,7 +163,7 @@ public sealed class ButtonsPage(MainWindow window) : IPage
     private void Assign(string button, ActionSpec? action)
     {
         var index = ProfileIndex;
-        Services.Config.Update(config =>
+        Draft.Edit(config =>
         {
             if (index >= config.Profiles.Count) return;
             var profile = config.Profiles[index];
@@ -176,7 +176,7 @@ public sealed class ButtonsPage(MainWindow window) : IPage
     {
         var index = ProfileIndex;
         var value = action is NativeAction ? null : action;
-        Services.Config.Update(config =>
+        Draft.Edit(config =>
         {
             if (index >= config.Profiles.Count) return;
             if (left) config.Profiles[index].ThumbWheelLeft = value;

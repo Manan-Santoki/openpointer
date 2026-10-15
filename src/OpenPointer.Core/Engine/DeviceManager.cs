@@ -158,7 +158,10 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
         }
 
         var context = FocusTracker.Snapshot();
-        var action = ContextMatcher.ResolveButton(_config.Current, context, ButtonNames.FromCid(cid));
+        var button = ButtonNames.FromCid(cid);
+        var action = ContextMatcher.ResolveButton(_config.Current, context, button);
+        var profile = ContextMatcher.FindAppProfile(_config.Current, context)?.Name ?? "All applications";
+        Log.Info($"{button} pressed in {context.DisplayName} [{context.ProcessName}/{context.WindowClass}] -> {profile}: {action.Describe()}");
         Runner.Press(mouse, cid, action);
     }
 
@@ -341,6 +344,7 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
 
                 await mouse.Device.SetDivertAsync(control.Cid, wanted.Divert, wanted.Raw).ConfigureAwait(false);
                 mouse.AppliedDivert[control.Cid] = wanted;
+                Log.Info($"{ButtonNames.FromCid(control.Cid)} {(wanted.Divert ? "remapped" : "native")} for {context.DisplayName}");
             }
 
             if (mouse.HasThumbWheel)

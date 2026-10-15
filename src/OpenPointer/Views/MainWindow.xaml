@@ -53,6 +53,7 @@
                     <RowDefinition Height="40" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" WindowChrome.IsHitTestVisibleInChrome="True">
@@ -76,6 +77,24 @@
                             <TextBlock Text="It takes over the same buttons, so your changes may not apply." Style="{StaticResource Caption}" Margin="0,2,0,0" />
                         </StackPanel>
                         <Button Grid.Column="2" Content="Stop Options+" Click="OnStopOptionsPlus" />
+                    </Grid>
+                </Border>
+
+                <!-- Unsaved changes -->
+                <Border x:Name="SaveBar" Grid.Row="3" BorderBrush="{DynamicResource Border}" BorderThickness="0,1,0,0"
+                        Background="{DynamicResource Background}" Padding="40,12" Visibility="Collapsed">
+                    <Grid MaxWidth="760">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Unsaved changes" Style="{StaticResource Label}" />
+                            <TextBlock Text="Buttons keep their current behavior until you save." Style="{StaticResource Caption}" Margin="0,2,0,0" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Content="Discard" Click="OnDiscard" MinWidth="88" />
+                        <Button Grid.Column="2" Content="Save" Click="OnSave" Style="{StaticResource PrimaryButton}" MinWidth="88" Margin="8,0,0,0" />
                     </Grid>
                 </Border>
 

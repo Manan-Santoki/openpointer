@@ -76,6 +76,7 @@ public partial class App : Application
         devices.Start();
         AppDomain.CurrentDomain.ProcessExit += (_, _) => devices.RestoreDevices();
 
+        Draft.Initialize();
         _tray = new TrayIcon();
         config.Error += message => Dispatcher.BeginInvoke(() => _tray?.Balloon("Configuration error", message));
         if (configError != null) _tray.Balloon("Configuration error", $"Using defaults. {configError}");

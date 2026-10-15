@@ -52,6 +52,16 @@ public static class ActionCatalog
             new("Zoom in", new KeysAction("ctrl+plus")),
             new("Zoom out", new KeysAction("ctrl+minus")),
         ]),
+        // Launch actions work anywhere, including the desktop, where shortcuts like Ctrl+T have no target.
+        new("Apps",
+        [
+            new("Chrome: new tab", new LaunchAction("chrome.exe", "chrome://newtab")),
+            new("Edge: new tab", new LaunchAction("msedge.exe", "edge://newtab")),
+            new("File Explorer", new LaunchAction("explorer.exe")),
+            new("Task Manager", new LaunchAction("taskmgr.exe")),
+            new("Calculator", new LaunchAction("calc.exe")),
+            new("Settings", new LaunchAction("ms-settings:")),
+        ]),
         new("Media",
         [
             new("Play / pause", new KeysAction("media_play_pause")),

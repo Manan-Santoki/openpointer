@@ -43,6 +43,7 @@ public sealed record KeysAction(string Keys) : ActionSpec
     /// </summary>
     public bool? Repeat { get; init; }
 
+    [JsonIgnore]
     public bool ShouldRepeat => Repeat ?? KeyChord.IsRepeatable(Keys);
 
     public override string Describe() => KeyChord.Format(Keys);

@@ -42,6 +42,7 @@ public partial class MainWindow : Window
         Services.Config.Changed += OnConfigChanged;
         ThemeManager.Changed += Render;
         UpdateManager.Changed += Render;
+        Draft.Changed += OnDraftChanged;
         StateChanged += (_, _) =>
         {
             Frame.Margin = WindowState == WindowState.Maximized ? new Thickness(7) : new Thickness(0);
@@ -49,6 +50,12 @@ public partial class MainWindow : Window
         };
         Closing += (_, _) =>
         {
+            if (Draft.IsDirty)
+            {
+                if (Dialogs.Confirm(this, "Save your changes?", "You changed buttons or profiles without saving.", "Save")) Draft.Save();
+                else Draft.Discard();
+            }
+
             // Closing the window cancels any open dialogs so their callers unwind.
             foreach (var dialog in _dialogs.ToList()) dialog.Close();
         };
@@ -59,8 +66,10 @@ public partial class MainWindow : Window
             Services.Config.Changed -= OnConfigChanged;
             ThemeManager.Changed -= Render;
             UpdateManager.Changed -= Render;
+            Draft.Changed -= OnDraftChanged;
         };
         UpdateBanner();
+        SaveBar.Visibility = Draft.IsDirty ? Visibility.Visible : Visibility.Collapsed;
         RenderNow();
     }
 
@@ -188,6 +197,16 @@ public partial class MainWindow : Window
         Shell.IsEnabled = true;
         Shell.Effect = null;
     }
+
+    private void OnDraftChanged()
+    {
+        SaveBar.Visibility = Draft.IsDirty ? Visibility.Visible : Visibility.Collapsed;
+        Render();
+    }
+
+    private void OnSave(object sender, RoutedEventArgs e) => Draft.Save();
+
+    private void OnDiscard(object sender, RoutedEventArgs e) => Draft.Discard();
 
     private void OnMinimize(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
 
