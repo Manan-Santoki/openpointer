@@ -1,0 +1,31 @@
+{
+  "id": "macos-sierra",
+  "name": "macOS",
+  "description": "macOS Sierra and newer pointers, high-DPI",
+  "author": "antiden",
+  "source": "https://github.com/antiden/macOS-cursors-for-Windows",
+  "license": "MIT",
+  "licenseFile": "LICENSE.md",
+  "shadow": { "on": "shadow", "off": "no-shadow" },
+  "sizes": { "normal": "normal", "large": "large", "xlarge": "xlarge" },
+  "path": "{shadow}/{size}",
+  "roles": {
+    "Arrow": "Normal.cur",
+    "Help": "Help.cur",
+    "AppStarting": "Working.ani",
+    "Wait": "Busy.ani",
+    "Crosshair": "Precision.cur",
+    "IBeam": "Text.cur",
+    "NWPen": "Handwriting.cur",
+    "No": "Unavailable.cur",
+    "SizeNS": "Vertical Resize.cur",
+    "SizeWE": "Horizontal Resize.cur",
+    "SizeNWSE": "Diagonal Resize 1.cur",
+    "SizeNESW": "Diagonal Resize 2.cur",
+    "SizeAll": "Move.cur",
+    "UpArrow": "Alternate.cur",
+    "Hand": "Link.cur",
+    "Pin": "Pin.cur",
+    "Person": "Person.cur"
+  }
+}

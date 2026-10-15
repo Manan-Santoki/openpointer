@@ -26,6 +26,14 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        if (e.Args.Contains("--restore-cursors"))
+        {
+            // Used by the uninstaller: put back the user's own cursors, then exit.
+            CursorManager.Restore();
+            Shutdown();
+            return;
+        }
+
         var captureIndex = Array.IndexOf(e.Args, "--capture-docs");
         if (captureIndex >= 0)
         {

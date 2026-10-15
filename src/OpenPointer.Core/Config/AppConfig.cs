@@ -65,6 +65,15 @@ public sealed class GeneralSettings
 
     /// <summary>Look for new releases on GitHub in the background.</summary>
     public bool CheckForUpdates { get; set; } = true;
+
+    /// <summary>"unchanged" (leave Windows alone), "windows" or "macos".</summary>
+    public string CursorTheme { get; set; } = "unchanged";
+
+    /// <summary>macOS cursors with a drop shadow.</summary>
+    public bool CursorShadow { get; set; } = true;
+
+    /// <summary>macOS cursor size: "normal", "large" or "xlarge".</summary>
+    public string CursorSize { get; set; } = "normal";
 }
 
 /// <summary>Hardware settings. Null means "leave whatever the device has".</summary>

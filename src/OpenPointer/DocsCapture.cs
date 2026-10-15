@@ -29,7 +29,8 @@ public static class DocsCapture
         for (var i = 0; i < 40 && devices.Mice.Count == 0; i++) await Task.Delay(250);
         await Task.Delay(800);
 
-        var window = new MainWindow { Width = 1080, Height = 720, ShowActivated = false, Left = -20000, Top = 0 };
+        var height = int.TryParse(Environment.GetEnvironmentVariable("OPENPOINTER_CAPTURE_HEIGHT"), out var h) ? h : 720;
+        var window = new MainWindow { Width = 1080, Height = height, ShowActivated = false, Left = -20000, Top = 0 };
         window.Show();
         foreach (var (page, file) in new[] { ("Buttons", "buttons"), ("Pointer", "pointer"), ("Apps", "applications"), ("Settings", "settings") })
         {

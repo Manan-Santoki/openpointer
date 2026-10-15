@@ -21,6 +21,7 @@ An open-source, customizable alternative to Logi Options+ for Windows. It talks 
 - **Pointer speed** with the device's real DPI range, presets, and per-app DPI.
 - **Scrolling:** scroll speed, smooth (high-resolution) scrolling, natural scrolling, SmartShift on/off and sensitivity, ratchet/free spin, thumb wheel remap and invert.
 - **Backup:** export and import all settings as one file.
+- **Cursor styles:** switch Windows between its default cursors and bundled packs (macOS, with or without shadow, three sizes). Your original cursors are backed up and restored on request or on uninstall. Packs are plain folders with a `pack.json`; see [adding a cursor pack](src/OpenPointer/Assets/Cursors/README.md).
 - **Battery** in the tray, the window, and a low-battery notification.
 - **Tray menu** to change the focused app's buttons, DPI and wheel mode on the fly.
 - **One JSON file** (`%APPDATA%\OpenPointer\config.json`), reloaded live when edited.
@@ -90,4 +91,4 @@ OPENPOINTER_TRACE=1 dotnet run --project src/OpenPointer.Cli  # log every HID++ 
 
 ## License
 
-MIT. Geist fonts under the SIL Open Font License. Not affiliated with Logitech; Logitech, Logi, MX Master and Options+ are trademarks of Logitech.
+MIT. Geist fonts under the SIL Open Font License. macOS cursors by [antiden](https://github.com/antiden/macOS-cursors-for-Windows) under MIT. Not affiliated with Logitech; Logitech, Logi, MX Master and Options+ are trademarks of Logitech.

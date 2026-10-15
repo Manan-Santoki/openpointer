@@ -42,10 +42,12 @@ public sealed class ButtonsPage(MainWindow window) : IPage
                 picked => Assign(button, picked),
                 inheritLabel: !isDefault && own != null ? "Use All applications setting" : null,
                 allowGestures: mouse.SupportsGestures(button)));
-            rows.Add(Ui.Row(ButtonNames.Label(button), caption, picker));
-
-            if (own is GestureAction gesture) rows.Add(GestureRows(button, gesture));
-            if (own is ActionRingAction ring) rows.Add(RingRows(button, ring));
+            // A button and its nested editor form one row, so no divider separates them.
+            var group = new StackPanel();
+            group.Children.Add(Ui.Row(ButtonNames.Label(button), caption, picker));
+            if (own is GestureAction gesture) group.Children.Add(GestureRows(button, gesture));
+            if (own is ActionRingAction ring) group.Children.Add(RingRows(button, ring));
+            rows.Add(group);
         }
 
         if (mouse.HasThumbWheel)
@@ -122,7 +124,7 @@ public sealed class ButtonsPage(MainWindow window) : IPage
 
     private FrameworkElement GestureRows(string button, GestureAction gesture)
     {
-        var panel = new StackPanel { Margin = new Thickness(16, 0, 16, 12) };
+        var panel = new StackPanel { Margin = new Thickness(16, 0, 16, 16) };
         var inner = new StackPanel();
         (string Glyph, string Name, ActionSpec? Value, Func<GestureAction, ActionSpec?, GestureAction> With)[] directions =
         [
@@ -163,7 +165,7 @@ public sealed class ButtonsPage(MainWindow window) : IPage
 
     private FrameworkElement RingRows(string button, ActionRingAction ring)
     {
-        var panel = new StackPanel { Margin = new Thickness(16, 0, 16, 12) };
+        var panel = new StackPanel { Margin = new Thickness(16, 0, 16, 16) };
         var inner = new StackPanel();
         for (var i = 0; i < ring.Items.Count; i++)
         {

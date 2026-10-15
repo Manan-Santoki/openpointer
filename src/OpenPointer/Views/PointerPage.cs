@@ -23,6 +23,8 @@ public sealed class PointerPage(MainWindow window) : IPage
         if (mouse == null)
         {
             page.Children.Add(EmptyState.Create("", "No mouse connected", "Turn on your mouse, or plug in its receiver."));
+            page.Children.Add(new Border { Height = 24 });
+            AddCursorSection(page);
             return page;
         }
 
@@ -94,6 +96,8 @@ public sealed class PointerPage(MainWindow window) : IPage
             page.Children.Add(Ui.Card(wheelRows));
         }
 
+        AddCursorSection(page);
+
         if (mouse.Hosts is { Count: > 1 } hosts)
         {
             page.Children.Add(Ui.Section("Easy-Switch", "Move the mouse to another paired computer. It disconnects from this PC."));
@@ -130,6 +134,74 @@ public sealed class PointerPage(MainWindow window) : IPage
             Ui.Row("Protocol", null, Value(device.Protocol != null ? $"HID++ {device.Protocol}" : "Unknown")),
         ]));
         return page;
+    }
+
+    private void AddCursorSection(StackPanel page)
+    {
+        var general = Services.Config.Current.General;
+        page.Children.Add(Ui.Section("Cursor", "Changes the pointer for all of Windows."));
+
+        var styles = new List<(string Label, string Value)> { ("Windows", CursorManager.Windows) };
+        styles.AddRange(CursorManager.Packs.Select(p => (p.Name, p.Id)));
+        var pack = CursorManager.Find(general.CursorTheme);
+        var styleCaption = general.CursorTheme == CursorManager.Unchanged ? "Not changed by OpenPointer"
+            : pack != null ? $"{pack.Description ?? pack.Name} · {pack.Attribution}" : null;
+        var rows = new List<UIElement>
+        {
+            Ui.Row("Style", styleCaption, Segments("cursor-style", [.. styles], general.CursorTheme, value => UpdateCursor(g => g.CursorTheme = value))),
+        };
+
+        if (pack != null)
+        {
+            if (pack.HasShadowOption)
+                rows.Add(Ui.Row("Shadow", "Soft drop shadow under the pointer",
+                    Ui.Switch(general.CursorShadow, on => UpdateCursor(g => g.CursorShadow = on))));
+            if (pack.SizeKeys.Count > 1)
+            {
+                var labels = new Dictionary<string, string> { ["normal"] = "Normal", ["large"] = "Large", ["xlarge"] = "Extra large" };
+                var current = pack.SizeKeys.Contains(general.CursorSize) ? general.CursorSize : pack.SizeKeys[0];
+                rows.Add(Ui.Row("Size", null, Segments("cursor-size", [.. pack.SizeKeys.Select(k => (labels[k], k))], current,
+                    value => UpdateCursor(g => g.CursorSize = value))));
+            }
+
+            if (pack.Source != null)
+                rows.Add(Ui.Row("Source", pack.Source, Ui.Button("Open", () =>
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(pack.Source) { UseShellExecute = true })?.Dispose())));
+        }
+
+        if (Platform.CursorThemes.HasBackup)
+        {
+            rows.Add(Ui.Row("Original cursors", "Put back the cursors you had before OpenPointer changed them",
+                Ui.Button("Restore", () =>
+                {
+                    CursorManager.Restore();
+                    Services.Config.Update(c => c.General.CursorTheme = CursorManager.Unchanged);
+                })));
+        }
+
+        page.Children.Add(Ui.Card(rows));
+    }
+
+    private static void UpdateCursor(Action<GeneralSettings> change)
+    {
+        Services.Config.Update(c => change(c.General));
+        CursorManager.Apply(Services.Config.Current.General);
+    }
+
+    private static Border Segments(string group, (string Label, string Value)[] options, string current, Action<string> pick)
+    {
+        var panel = new StackPanel { Orientation = Orientation.Horizontal };
+        foreach (var (label, value) in options)
+        {
+            var segment = new RadioButton { Style = Ui.Style("Segment"), Content = label, GroupName = group, IsChecked = current == value };
+            segment.Checked += (_, _) =>
+            {
+                if (current != value) pick(value);
+            };
+            panel.Children.Add(segment);
+        }
+
+        return new Border { Style = Ui.Style("SegmentGroup"), Child = panel };
     }
 
     private Border DpiCard(ConnectedMouse mouse, DpiInfo dpi)

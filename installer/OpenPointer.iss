@@ -75,6 +75,8 @@ Filename: "{app}\{#AppExe}"; Description: "Launch {#AppName}"; Flags: nowait pos
 Filename: "{app}\{#AppExe}"; Parameters: "--background"; Flags: nowait; Check: WizardSilent
 
 [UninstallRun]
+; Put back the user's own cursors if OpenPointer changed them.
+Filename: "{app}\{#AppExe}"; Parameters: "--restore-cursors"; Flags: runhidden skipifdoesntexist; RunOnceId: "RestoreCursors"
 ; Ask a running instance to hand the buttons back to the mouse and exit.
 Filename: "{app}\{#AppExe}"; Parameters: "--quit"; Flags: runhidden skipifdoesntexist; RunOnceId: "QuitApp"
 
