@@ -39,6 +39,17 @@ public static class DocsCapture
             Save(window, Path.Combine(directory, file + ".png"));
         }
 
+        // A dialog, for checking modal layout.
+        if (CursorManager.Packs.FirstOrDefault() is { } pack)
+        {
+            window.Navigate("Cursors");
+            _ = window.Dispatcher.BeginInvoke(() => window.CursorsPageInstance.ShowPointers(pack, true, "normal"));
+            await Task.Delay(1200);
+            Save(window, Path.Combine(directory, "dialog-pointers.png"));
+            window.CloseDialogs();
+            await Task.Delay(200);
+        }
+
         window.Close();
         devices.Dispose();
         Application.Current.Shutdown();

@@ -20,26 +20,57 @@ public sealed class DialogHost : Border
 
     public DialogHost(string title, string? description, UIElement body, double width = 440)
     {
-        var stack = new StackPanel();
-        stack.Children.Add(Ui.Text(title, "Heading", 16));
+        // Header: title and description, with a close button in the corner.
+        var header = new Grid();
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var heading = new StackPanel { Margin = new Thickness(0, 0, 12, 0) };
+        heading.Children.Add(Ui.Text(title, "Heading", 16));
         if (description != null)
         {
             var caption = Ui.Text(description, "MutedText");
             caption.TextWrapping = TextWrapping.Wrap;
             caption.TextTrimming = TextTrimming.None;
             caption.Margin = new Thickness(0, 4, 0, 0);
-            stack.Children.Add(caption);
+            heading.Children.Add(caption);
         }
 
-        if (body is FrameworkElement element) element.Margin = new Thickness(0, 20, 0, 0);
-        stack.Children.Add(body);
+        header.Children.Add(heading);
+        var close = new Button
+        {
+            Style = Ui.Style("IconButton"),
+            Content = Ui.Icon("", 12, "MutedForeground"),
+            Width = 28,
+            Height = 28,
+            VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Thickness(0, -6, -10, 0),
+            ToolTip = "Close (Esc)",
+            IsCancel = true,
+        };
+        close.Click += (_, _) => Close();
+        Grid.SetColumn(close, 1);
+        header.Children.Add(close);
+
+        var stack = new DockPanel { LastChildFill = true };
+        DockPanel.SetDock(header, Dock.Top);
+        stack.Children.Add(header);
         _footer = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 24, 0, 0) };
+        DockPanel.SetDock(_footer, Dock.Bottom);
         stack.Children.Add(_footer);
+
+        if (body is FrameworkElement element) element.Margin = new Thickness(0, 20, 0, 0);
+        // Tall content scrolls instead of pushing the footer out of view.
+        stack.Children.Add(body is ScrollViewer ? body : new ScrollViewer
+        {
+            Content = body,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            Focusable = false,
+        });
 
         Style = Ui.Style("Card");
         Padding = new Thickness(24);
         Width = width;
-        MaxHeight = 640;
         Child = stack;
         HorizontalAlignment = HorizontalAlignment.Center;
         VerticalAlignment = VerticalAlignment.Center;

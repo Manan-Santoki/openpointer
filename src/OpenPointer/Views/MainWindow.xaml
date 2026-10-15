@@ -113,8 +113,8 @@
 
         <!-- Modal layer: dims and blurs the shell; dialogs stack in DialogStack. -->
         <Grid x:Name="OverlayLayer" Visibility="Collapsed">
-            <Rectangle Fill="{DynamicResource Overlay}" />
-            <Grid x:Name="DialogStack" Margin="24,48,24,24" />
+            <Rectangle Fill="{DynamicResource Overlay}" MouseLeftButtonDown="OnBackdropClick" />
+            <Grid x:Name="DialogStack" Margin="24,48,24,24" MouseLeftButtonDown="OnBackdropClick" Background="Transparent" />
             <!-- Keep the caption buttons usable so the window can still be moved to the back or minimized. -->
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" WindowChrome.IsHitTestVisibleInChrome="True">
                 <Button Style="{StaticResource CaptionButton}" Content="&#xE921;" Click="OnMinimize" ToolTip="Minimize" />

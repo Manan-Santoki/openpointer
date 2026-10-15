@@ -50,6 +50,13 @@ public partial class MainWindow : Window
             Frame.Margin = WindowState == WindowState.Maximized ? new Thickness(7) : new Thickness(0);
             MaximizeButton.Content = WindowState == WindowState.Maximized ? "" : "";
         };
+        PreviewKeyDown += (_, e) =>
+        {
+            // Esc closes the top dialog wherever keyboard focus is.
+            if (e.Key != System.Windows.Input.Key.Escape || _dialogs.Count == 0) return;
+            e.Handled = true;
+            _dialogs[^1].Close();
+        };
         Closing += (_, _) =>
         {
             if (Draft.IsDirty && !App.IsQuitting)
@@ -188,6 +195,9 @@ public partial class MainWindow : Window
     {
         if (_dialogs.Count > 0) _dialogs[^1].Visibility = Visibility.Hidden;
         _dialogs.Add(dialog);
+        // Keep dialogs inside the window as it resizes; their body scrolls when space runs out.
+        dialog.SetBinding(MaxWidthProperty, new System.Windows.Data.Binding(nameof(ActualWidth)) { Source = DialogStack });
+        dialog.SetBinding(MaxHeightProperty, new System.Windows.Data.Binding(nameof(ActualHeight)) { Source = DialogStack });
         DialogStack.Children.Add(dialog);
         OverlayLayer.Visibility = Visibility.Visible;
         Shell.IsEnabled = false;
@@ -207,6 +217,21 @@ public partial class MainWindow : Window
         OverlayLayer.Visibility = Visibility.Collapsed;
         Shell.IsEnabled = true;
         Shell.Effect = null;
+    }
+
+    /// <summary>Clicking the dimmed area around a dialog closes it.</summary>
+    private void OnBackdropClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource != sender || _dialogs.Count == 0) return;
+        e.Handled = true;
+        _dialogs[^1].Close();
+    }
+
+    internal CursorsPage CursorsPageInstance => _cursors;
+
+    internal void CloseDialogs()
+    {
+        foreach (var dialog in _dialogs.ToList()) dialog.Close();
     }
 
     private void OnDraftChanged()

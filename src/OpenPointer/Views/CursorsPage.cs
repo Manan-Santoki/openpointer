@@ -121,16 +121,15 @@ public sealed class CursorsPage(MainWindow window) : IPage
     }
 
     /// <summary>All 17 pointers of a style in a dialog.</summary>
-    private void ShowPointers(CursorPack? pack, bool shadow, string size)
+    internal void ShowPointers(CursorPack? pack, bool shadow, string size)
     {
-        var grid = new WrapPanel { Margin = new Thickness(0, 0, -12, 0) };
+        var grid = new System.Windows.Controls.Primitives.UniformGrid { Columns = 4, Margin = new Thickness(-6, -6, -6, 0) };
         foreach (var role in CursorThemes.Roles)
             grid.Children.Add(RoleTile(role, FileFor(pack, role, shadow, size)));
 
         var name = pack?.Name ?? "Windows";
         var description = pack == null ? "The standard Windows pointers." : $"{pack.Description} · {pack.Attribution}";
-        var body = new ScrollViewer { Content = grid, MaxHeight = 480, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-        var dialog = new DialogHost($"{name} pointers", description, body, 700);
+        var dialog = new DialogHost($"{name} pointers", description, grid, 720);
         if (pack?.Source is { } source)
             dialog.AddButton("Source", false, () =>
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(source) { UseShellExecute = true })?.Dispose());
@@ -224,7 +223,7 @@ public sealed class CursorsPage(MainWindow window) : IPage
         var body = new StackPanel();
         body.Children.Add(stage);
         body.Children.Add(label);
-        return new Border { Width = 152, Margin = new Thickness(0, 0, 12, 14), Child = body };
+        return new Border { Margin = new Thickness(6, 6, 6, 10), Child = body };
     }
 
     private static string? FileFor(CursorPack? pack, string role, bool shadow, string size)
