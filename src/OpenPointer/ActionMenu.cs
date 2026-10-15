@@ -34,7 +34,8 @@ public static class ActionMenu
             var any = false;
             foreach (var entry in group.Entries)
             {
-                var selected = entry.Action == current;
+                var selected = entry.Action == current ||
+                               (current is KeysAction ck && entry.Action is KeysAction ek && ek.Keys == ck.Keys);
                 any |= selected;
                 sub.Items.Add(Ui.MenuItem(entry.Label, () => pick(entry.Action), selected));
             }
@@ -47,6 +48,12 @@ public static class ActionMenu
         {
             target.Items.Add(Ui.MenuItem("Gestures", () => pick(current as GestureAction ?? GestureAction.WindowsDefaults),
                 current is GestureAction, "Hold + move"));
+        }
+
+        if (current is KeysAction held)
+        {
+            target.Items.Add(new Separator());
+            target.Items.Add(Ui.MenuItem("Repeat while held", () => pick(held with { Repeat = !held.ShouldRepeat }), held.ShouldRepeat));
         }
 
         target.Items.Add(new Separator());

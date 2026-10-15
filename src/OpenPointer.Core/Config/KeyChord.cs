@@ -66,6 +66,29 @@ public static class KeyChord
 
     public static bool IsModifier(ushort vk) => Modifiers.Contains(vk);
 
+    private static readonly HashSet<string> RepeatableKeys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "volume_up", "volume_down", "up", "down", "left", "right", "pageup", "pagedown",
+        "backspace", "delete", "del", "plus", "minus", "numpad_add", "numpad_subtract", "z", "y",
+    };
+
+    /// <summary>
+    /// Whether holding this chord should repeat it. True when its main key is one people hold on a
+    /// keyboard (volume, arrows, deletion, zoom, undo/redo) and no Win/Alt makes it a one-shot command.
+    /// </summary>
+    public static bool IsRepeatable(string chord)
+    {
+        var parts = chord.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length == 0) return false;
+        if (parts.Any(p => p.Equals("win", StringComparison.OrdinalIgnoreCase) || p.Equals("alt", StringComparison.OrdinalIgnoreCase)))
+            return false;
+        var main = parts[^1];
+        // Bare z/y would type letters; only undo/redo repeat.
+        if (main is "z" or "y" or "Z" or "Y")
+            return parts.Any(p => p.Equals("ctrl", StringComparison.OrdinalIgnoreCase));
+        return RepeatableKeys.Contains(main);
+    }
+
     /// <summary>Name for a virtual-key code, for building chords from captured key presses.</summary>
     public static string? NameOf(ushort vk) => vk switch
     {

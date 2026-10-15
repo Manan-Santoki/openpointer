@@ -173,3 +173,32 @@ public class TransportTests
         Assert.True(linked);
     }
 }
+
+public class RepeatTests
+{
+    [Theory]
+    [InlineData("volume_up", true)]
+    [InlineData("volume_down", true)]
+    [InlineData("ctrl+z", true)]
+    [InlineData("z", false)]
+    [InlineData("alt+f4", false)]
+    [InlineData("win+tab", false)]
+    [InlineData("media_play_pause", false)]
+    [InlineData("ctrl+plus", true)]
+    public void PicksRepeatableChords(string chord, bool expected) => Assert.Equal(expected, KeyChord.IsRepeatable(chord));
+
+    [Fact]
+    public void ExplicitRepeatOverridesAutomatic()
+    {
+        Assert.False(new KeysAction("volume_up") { Repeat = false }.ShouldRepeat);
+        Assert.True(new KeysAction("enter") { Repeat = true }.ShouldRepeat);
+    }
+
+    [Fact]
+    public void RepeatTimingIsWithinKeyboardRange()
+    {
+        var (delay, interval) = ActionRunner.Repeater.KeyboardRepeatTiming();
+        Assert.InRange(delay, 250, 1000);
+        Assert.InRange(interval, 33, 400);
+    }
+}

@@ -33,7 +33,7 @@ public static class Services
 
     private static string? _selectedName;
 
-    public static string ExecutablePath => Environment.ProcessPath ?? System.Reflection.Assembly.GetExecutingAssembly().Location;
+    public static string ExecutablePath => Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "OpenPointer.exe");
 }
 
 public static class ThemeManager

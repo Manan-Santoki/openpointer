@@ -74,6 +74,13 @@ internal static partial class NativeMethods
     [LibraryImport("user32.dll")]
     public static partial uint MapVirtualKeyW(uint uCode, uint uMapType);
 
+    public const uint SPI_GETKEYBOARDSPEED = 0x000A;
+    public const uint SPI_GETKEYBOARDDELAY = 0x0016;
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool SystemParametersInfoW(uint action, uint param, out uint value, uint winIni);
+
     [LibraryImport("user32.dll")]
     public static partial nint GetForegroundWindow();
 

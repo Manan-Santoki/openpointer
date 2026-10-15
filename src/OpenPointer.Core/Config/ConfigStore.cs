@@ -12,6 +12,8 @@ public sealed class ConfigStore : IDisposable
     public static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
+        // Keep chords like "ctrl+shift+t" readable instead of "ctrl+shift+t".
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         AllowOutOfOrderMetadataProperties = true,

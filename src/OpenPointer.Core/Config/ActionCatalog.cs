@@ -74,7 +74,7 @@ public static class ActionCatalog
     {
         foreach (var group in Groups)
             foreach (var entry in group.Entries)
-                if (entry.Action == action)
+                if (entry.Action == action || (action is KeysAction k && entry.Action is KeysAction e && e.Keys == k.Keys))
                     return entry.Label;
         return action.Describe();
     }

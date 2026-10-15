@@ -29,6 +29,53 @@ public sealed class ActionRunner
     private sealed class HeldKeys(IReadOnlyList<ushort> keys) : Held
     {
         public IReadOnlyList<ushort> Keys { get; } = keys;
+        public Repeater? Repeat { get; set; }
+    }
+
+    private sealed class HeldRepeat(Repeater repeat) : Held
+    {
+        public Repeater Repeat { get; } = repeat;
+    }
+
+    /// <summary>Re-runs an action at the user's keyboard repeat rate while a button is held.</summary>
+    internal sealed class Repeater : IDisposable
+    {
+        private readonly object _sync = new();
+        private readonly Action _tick;
+        private readonly Timer _timer;
+        private bool _stopped;
+
+        public Repeater(Action tick)
+        {
+            _tick = tick;
+            var (delay, interval) = KeyboardRepeatTiming();
+            _timer = new Timer(_ => Tick(), null, delay, interval);
+        }
+
+        private void Tick()
+        {
+            lock (_sync)
+            {
+                if (_stopped) return;
+                try { _tick(); } catch (Exception ex) { Log.Error("Repeat", ex); }
+            }
+        }
+
+        /// <summary>Stops repeating; once this returns no further tick runs.</summary>
+        public void Dispose()
+        {
+            lock (_sync) _stopped = true;
+            _timer.Dispose();
+        }
+
+        /// <summary>Windows keyboard settings: delay 0-3 (250-1000 ms), speed 0-31 (~2.5-30 per second).</summary>
+        internal static (int DelayMs, int IntervalMs) KeyboardRepeatTiming()
+        {
+            var delay = Platform.NativeMethods.SystemParametersInfoW(Platform.NativeMethods.SPI_GETKEYBOARDDELAY, 0, out var d, 0) ? d : 1;
+            var speed = Platform.NativeMethods.SystemParametersInfoW(Platform.NativeMethods.SPI_GETKEYBOARDSPEED, 0, out var s, 0) ? s : 31;
+            var perSecond = 2.5 + Math.Min(speed, 31u) * (27.5 / 31.0);
+            return ((int)(Math.Min(delay, 3u) + 1) * 250, (int)Math.Round(1000 / perSecond));
+        }
     }
 
     private sealed class HeldMouse(MouseButtonKind button) : Held
@@ -74,7 +121,24 @@ public sealed class ActionRunner
                 case KeysAction keys:
                     var codes = KeyChord.Parse(keys.Keys);
                     InputSynth.KeyDown(codes);
-                    held = new HeldKeys(codes);
+                    var heldKeys = new HeldKeys(codes);
+                    if (keys.ShouldRepeat)
+                    {
+                        // Like typematic repeat: modifiers stay down, the main key re-fires.
+                        var main = codes.Where(c => !KeyChord.IsModifier(c)).ToList();
+                        if (main.Count > 0)
+                            heldKeys.Repeat = new Repeater(() =>
+                            {
+                                InputSynth.KeyUp(main);
+                                InputSynth.KeyDown(main);
+                            });
+                    }
+
+                    held = heldKeys;
+                    break;
+                case ScrollAction { Repeat: true } scroll:
+                    InputSynth.Scroll(scroll.Amount, scroll.Horizontal);
+                    held = new HeldRepeat(new Repeater(() => InputSynth.Scroll(scroll.Amount, scroll.Horizontal)));
                     break;
                 case MouseAction m:
                     InputSynth.MouseButton(m.Button, down: true);
@@ -113,7 +177,11 @@ public sealed class ActionRunner
             switch (held)
             {
                 case HeldKeys keys:
+                    keys.Repeat?.Dispose();
                     InputSynth.KeyUp(keys.Keys);
+                    break;
+                case HeldRepeat repeat:
+                    repeat.Repeat.Dispose();
                     break;
                 case HeldMouse m:
                     InputSynth.MouseButton(m.Button, down: false);

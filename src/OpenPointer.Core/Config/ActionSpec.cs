@@ -37,6 +37,14 @@ public sealed record NoneAction : ActionSpec
 /// <summary>A keyboard chord such as "ctrl+shift+t", "win+tab" or "media_play_pause". Held while the button is held.</summary>
 public sealed record KeysAction(string Keys) : ActionSpec
 {
+    /// <summary>
+    /// Repeat while held, like a keyboard key. Null picks automatically: on for keys people hold
+    /// (volume, arrows, page up/down, delete, zoom), off for one-shot chords like alt+f4.
+    /// </summary>
+    public bool? Repeat { get; init; }
+
+    public bool ShouldRepeat => Repeat ?? KeyChord.IsRepeatable(Keys);
+
     public override string Describe() => KeyChord.Format(Keys);
 }
 
@@ -65,6 +73,9 @@ public sealed record MouseAction(MouseButtonKind Button) : ActionSpec
 /// <summary>Scrolls by a number of wheel notches (positive = up/right).</summary>
 public sealed record ScrollAction(int Amount, bool Horizontal = false) : ActionSpec
 {
+    /// <summary>Keep scrolling while the button is held.</summary>
+    public bool Repeat { get; init; } = true;
+
     public override string Describe() => Horizontal
         ? Amount > 0 ? "Scroll right" : "Scroll left"
         : Amount > 0 ? "Scroll up" : "Scroll down";

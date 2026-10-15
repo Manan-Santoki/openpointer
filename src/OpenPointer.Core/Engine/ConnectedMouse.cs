@@ -24,9 +24,15 @@ public sealed class ConnectedMouse
     public bool HasThumbWheel { get; internal set; }
     public int? WheelFlags { get; internal set; }
 
-    /// <summary>Buttons the user can remap, by config name.</summary>
+    /// <summary>Buttons the user can remap, by config name, top of the mouse first (forward sits above back).</summary>
     public IReadOnlyList<string> Buttons =>
-        Device.Controls.Where(ButtonNames.IsUserFacing).Select(c => ButtonNames.FromCid(c.Cid)).ToList();
+        Device.Controls.Where(ButtonNames.IsUserFacing)
+            .Select(c => ButtonNames.FromCid(c.Cid))
+            .OrderBy(name => Array.IndexOf(DisplayOrder, name) is var i && i >= 0 ? i : DisplayOrder.Length)
+            .ToList();
+
+    private static readonly string[] DisplayOrder =
+        [ButtonNames.Middle, ButtonNames.Forward, ButtonNames.Back, ButtonNames.Gesture, ButtonNames.WheelMode];
 
     public bool SupportsGestures(string button)
     {
