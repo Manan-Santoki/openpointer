@@ -1,116 +1,68 @@
 # OpenPointer
 
-**Customize your Logitech mouse on Windows: free, open source, and without Logi Options+.**
+[![Latest release](https://img.shields.io/github/v/release/Manan-Santoki/openpointer)](https://github.com/Manan-Santoki/openpointer/releases/latest)
+[![License: MIT](https://img.shields.io/github/license/Manan-Santoki/openpointer)](LICENSE)
 
-Remap any button, per app. Add gestures and an Actions Ring, set pointer speed, change your cursor style, and see your battery level. No account, no cloud, no telemetry.
+OpenPointer configures Logitech mice on Windows without Logi Options+. It talks to the mouse directly over HID++ 2.0, the protocol Options+ itself uses, so there's no Logitech account, cloud sync or telemetry involved.
 
-![Remap buttons per app, with an Actions Ring](docs/screenshots/buttons.png)
+I started it because I wanted the side buttons on my mouse to do different things on the desktop than in File Explorer, and to keep changing the volume while I hold a button. Options+ can't do either.
 
-<table>
-  <tr>
-    <td><img src="docs/screenshots/cursors.png" alt="Cursor styles" /></td>
-    <td><img src="docs/screenshots/applications.png" alt="App profiles" /></td>
-  </tr>
-</table>
+<p align="center">
+  <img src="docs/screenshots/buttons.png" width="49%" />
+  <img src="docs/screenshots/cursors.png" width="49%" />
+</p>
 
-## Download
+It can:
 
-**[Download the latest installer](https://github.com/Manan-Santoki/openpointer/releases/latest)** (`OpenPointer-Setup-x.y.z.exe`) and run it.
+- remap buttons, globally or per app (the desktop and taskbar count as separate apps)
+- send shortcuts, open apps, files or URLs, type text, and run macros
+- repeat keys like volume and arrows while the button is held
+- do gestures, and show an Actions Ring (hold a button, aim at an action, release)
+- change DPI, scroll speed, SmartShift and the thumb wheel, if your mouse has them
+- switch Windows cursors between the default set and a macOS set
+- show battery level in the tray and warn when it's low
 
-- Windows 10 (1809) or newer, 64-bit.
-- No admin rights needed. It installs just for you.
-- Prefer not to install? Each release also has a portable zip.
+## Install
 
-Windows may show a SmartScreen warning the first time, because the app isn't code-signed yet. Click **More info → Run anyway**.
+Download `OpenPointer-Setup-x.y.z.exe` from the [latest release](https://github.com/Manan-Santoki/openpointer/releases/latest) and run it. It installs for the current user and doesn't need admin rights. Each release also has a portable zip.
 
-## What you can do
+The builds aren't code-signed yet, so SmartScreen will warn you the first time. Click "More info", then "Run anyway".
 
-### Remap buttons
-Give any button a new job:
-- keyboard shortcuts
-- back/forward, middle click, scrolling
-- open an app, file or website
-- type text, media and volume keys
-- multi-step **macros**
+Quit Logi Options+ before using OpenPointer, since only one of them can control the buttons. OpenPointer will offer to stop it if it's running. You don't have to uninstall it.
 
-Keys like Volume or the arrow keys **repeat while you hold** the button, just like a keyboard.
+OpenPointer updates itself from GitHub releases. You can also check from Settings.
 
-### Different buttons for different apps
-Make the side buttons go back/forward in Chrome, change the volume in Spotify, and open your favorite apps on the **desktop**. The desktop and the taskbar each get their own profile, separate from File Explorer. Profiles switch the moment you change windows.
+## Usage
 
-### Gestures and the Actions Ring
-- **Gestures:** hold a button and move up, down, left or right, or just click. Each one runs its own action.
-- **Actions Ring:** hold a button and a circle of up to 8 actions appears around your pointer. Move toward one and let go.
+Open OpenPointer from the Start menu or the tray icon.
 
-### Pointer and scrolling
-- **Pointer speed (DPI)** with presets, and a different speed per app if you like.
-- **Scroll speed**, natural scrolling, and smooth scrolling (on mice whose wheel supports it).
-- **SmartShift** and ratchet or free-spin wheel modes on MX mice.
-- **Thumb wheel** actions and direction.
+- **Buttons:** pick a button and choose what it does, then click Save. The menu at the top switches between "All applications" and your per-app profiles.
+- **Applications:** add an app to give it its own buttons.
+- **Tray menu:** right-click the tray icon while any app is in front to change that app's buttons, DPI or wheel mode without opening the window.
 
-### Cursor styles
-Switch all of Windows between the standard cursors and a **macOS** style, with or without a shadow, in three sizes. Preview every pointer before applying. Your original cursors are saved, and you can restore them any time.
+Settings live in `%APPDATA%\OpenPointer\config.json`. You can edit the file by hand and it reloads when you save it.
 
-### Battery and quick controls
-Battery level is shown in the tray and in the app, and you get a warning when it runs low. Right-click the tray icon to change the current app's buttons, the pointer speed or the wheel mode without opening the window.
+Buttons are only remapped while OpenPointer runs. If you quit it, or it crashes, the mouse goes back to its normal behavior.
 
-## Getting started
+## Compatibility
 
-1. **Install and open OpenPointer.** It finds your mouse automatically.
-2. If **Logi Options+** is running, OpenPointer will offer to stop it. Both apps can't control the buttons at the same time. Options+ stays installed.
-3. Open **Buttons**, pick a button and choose an action. Click **Save** to apply.
-4. To customize a specific app, open **Applications → Add application**, or use the menu at the top of the Buttons page.
-5. For quick changes, right-click the **tray icon** while any app is in front and pick a button.
+- Windows 10 1809 or later, x64.
+- Logitech mice that speak HID++ 2.0, connected through a Bolt, Unifying or Lightspeed receiver or over Bluetooth. That's most Logitech mice from the last decade.
 
-OpenPointer keeps running in the tray. Close the window and it stays there; choose **Quit** from the tray menu to exit.
+So far it has only been tested on a Signature M650 L. If you try another mouse, please [open an issue](https://github.com/Manan-Santoki/openpointer/issues) saying whether it worked.
 
-## Supported mice
+Known limitations:
 
-Logitech mice that use the HID++ 2.0 protocol, connected through a **Logi Bolt**, **Unifying** or **Lightspeed** receiver, or **Bluetooth**. That should include most Logitech mice from roughly 2015 onward, such as the MX Master and MX Anywhere series, the Signature series, the M720 and the M585/M590.
+- Remapped buttons don't work in windows running as administrator, because Windows blocks input from normal apps there.
+- It doesn't pair devices or update firmware. Use Logitech's Logi Bolt app or Options+ for that.
+- Mice only for now, no keyboards.
 
-OpenPointer reads what your mouse supports and only shows the options it actually has.
+## Contributing
 
-**Tested on:** Signature M650 L. If your mouse works (or doesn't), please [say so in an issue](https://github.com/Manan-Santoki/openpointer/issues).
-
-## Updates
-
-OpenPointer checks for new versions automatically. When one is available you'll see a notification, plus **Install update** in the tray menu and in Settings. Updates are verified before they install, and the app restarts by itself. See the [changelog](CHANGELOG.md) for what changed in each version.
-
-## FAQ
-
-**My buttons stopped doing what I set.**
-Make sure Logi Options+ isn't running: OpenPointer shows a warning if it is. Also check that remapping isn't paused (tray menu → Pause remapping).
-
-**It doesn't work in some windows.**
-Windows doesn't let normal apps send input to apps running as administrator (Task Manager, installers and so on). Remapped buttons won't act on those windows.
-
-**What happens if I quit OpenPointer?**
-Your mouse goes back to its normal behavior right away. Remapping only happens while OpenPointer runs.
-
-**Where are my settings?**
-In `%APPDATA%\OpenPointer\config.json`. You can back them up or move them to another PC with **Settings → Backup → Export / Import**.
-
-**How do I uninstall?**
-Use **Settings → Apps** in Windows. Uninstalling also puts back your original cursors if you changed them.
-
-**Do I still need Logi Options+?**
-No, but keep it (or Logitech's Logi Bolt app) if you need to pair a new device to a receiver or update your mouse's firmware. OpenPointer doesn't do those.
-
-## Privacy
-
-OpenPointer works entirely on your PC. It has no account, no analytics and no telemetry. The only network request is the update check, which asks GitHub for the latest release.
-
-## Help and feedback
-
-Found a bug or have an idea? [Open an issue](https://github.com/Manan-Santoki/openpointer/issues). For bugs, attaching your log helps a lot: **Settings → Log → Open log**.
-
-Want to help build it? See [CONTRIBUTING.md](CONTRIBUTING.md).
+Bug reports, device reports and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). Release notes are in [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
-OpenPointer is free software under the [MIT license](LICENSE).
+MIT. The macOS cursors are by [antiden](https://github.com/antiden/macOS-cursors-for-Windows) (MIT), and the Geist font is under the SIL Open Font License.
 
-- macOS cursors by [antiden](https://github.com/antiden/macOS-cursors-for-Windows), MIT.
-- Geist font by Vercel, SIL Open Font License.
-
-Not affiliated with or endorsed by Logitech. Logitech, Logi, MX Master and Options+ are trademarks of Logitech.
+OpenPointer isn't affiliated with Logitech.
