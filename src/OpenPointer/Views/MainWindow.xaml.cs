@@ -99,6 +99,14 @@ public partial class MainWindow : Window
         else NavButtons.IsChecked = true;
     }
 
+    /// <summary>Switches page by name ("Buttons", "Pointer", "Apps", "Settings").</summary>
+    public void Navigate(string page)
+    {
+        var target = page switch { "Pointer" => NavPointer, "Apps" => NavApps, "Settings" => NavSettings, _ => NavButtons };
+        target.IsChecked = true;
+        RenderNow();
+    }
+
     private void OnNavigate(object sender, RoutedEventArgs e)
     {
         if (_buttons == null) return; // during InitializeComponent

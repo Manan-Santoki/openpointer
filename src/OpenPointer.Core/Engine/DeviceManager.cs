@@ -22,10 +22,14 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
     private readonly CancellationTokenSource _stop = new();
     private readonly object _transportSync = new();
     private FocusContext _focus = FocusContext.Unknown;
+    private readonly bool _passive;
 
-    public DeviceManager(ConfigStore config)
+    /// <param name="passive">Read device state only; never divert controls or change settings
+    /// (used for documentation captures next to a running instance).</param>
+    public DeviceManager(ConfigStore config, bool passive = false)
     {
         _config = config;
+        _passive = passive;
         Runner = new ActionRunner(this);
         _config.Changed += config => _ = ReapplyAllAsync(settingsChanged: true);
         new Thread(ActionLoop) { IsBackground = true, Name = "OpenPointer actions" }.Start();
@@ -294,6 +298,7 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
 
     private async Task ApplySettingsAsync(ConnectedMouse mouse)
     {
+        if (_passive) return;
         var settings = _config.Current.SettingsFor(mouse.Name);
         var device = mouse.Device;
 
@@ -324,6 +329,7 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
     /// <summary>Diverts exactly the controls the focused app remaps, and applies per-app DPI.</summary>
     private async Task ApplyContextAsync(ConnectedMouse mouse)
     {
+        if (_passive) return;
         await mouse.ApplyLock.WaitAsync().ConfigureAwait(false);
         try
         {
@@ -484,6 +490,7 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
     /// <summary>Hands every control back to the device so buttons keep working after we exit.</summary>
     public void RestoreDevices()
     {
+        if (_passive) return;
         var tasks = _mice.Values.Where(m => m.Online).Select(async mouse =>
         {
             foreach (var (cid, state) in mouse.AppliedDivert)

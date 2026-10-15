@@ -26,6 +26,13 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        var captureIndex = Array.IndexOf(e.Args, "--capture-docs");
+        if (captureIndex >= 0)
+        {
+            _ = DocsCapture.RunAsync(e.Args.ElementAtOrDefault(captureIndex + 1) ?? "docs/screenshots");
+            return;
+        }
+
         _singleton = new Mutex(true, InstanceName, out var isFirst);
         if (!isFirst)
         {

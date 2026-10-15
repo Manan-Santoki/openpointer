@@ -2,6 +2,15 @@
 
 An open-source, customizable alternative to Logi Options+ for Windows. It talks to Logitech mice directly over HID++ 2.0, so there is no account, no cloud, and no telemetry.
 
+![Buttons: per-app remapping with an Actions Ring](docs/screenshots/buttons.png)
+
+<table>
+  <tr>
+    <td><img src="docs/screenshots/pointer.png" alt="Pointer speed and scrolling" /></td>
+    <td><img src="docs/screenshots/applications.png" alt="Per-app profiles" /></td>
+  </tr>
+</table>
+
 ## Features
 
 - **Per-app button profiles.** Chrome, File Explorer, the desktop, the taskbar, or any `.exe`. Switches instantly when focus changes.
@@ -51,6 +60,14 @@ dotnet run --project src/OpenPointer
 Logi Options+ competes for the same buttons. OpenPointer detects it and offers to stop it (it stays installed).
 
 Command-line flags: `--background` (start in the tray), `--quit` (close a running instance).
+
+## Screenshots
+
+Regenerate the images above (renders the window to PNG without touching the mouse):
+
+```
+dotnet run --project src/OpenPointer -- --capture-docs docs/screenshots
+```
 
 ## Diagnostics
 
