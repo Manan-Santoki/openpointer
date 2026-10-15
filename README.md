@@ -41,7 +41,7 @@ The builds are not code-signed yet, so Windows SmartScreen may warn on first run
 
 ## Release
 
-Push a version tag; GitHub Actions tests, builds the installer and portable zip, and publishes the release:
+Add the version's entry to [CHANGELOG.md](CHANGELOG.md), then push a version tag. GitHub Actions takes the release notes from the changelog (and fails if the entry is missing), tests, builds the installer and portable zip, and publishes the release:
 
 ```
 git tag v0.3.0

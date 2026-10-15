@@ -30,6 +30,10 @@ jobs:
           if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Tag must look like v1.2.3, got ${{ github.ref_name }}" }
           "value=$version" >> $env:GITHUB_OUTPUT
 
+      - name: Release notes from CHANGELOG.md
+        shell: pwsh
+        run: ./.github/scripts/release-notes.ps1 -Version "${{ steps.version.outputs.value }}" -OutFile "$env:RUNNER_TEMP/notes.md"
+
       - name: Test
         run: dotnet test tests/OpenPointer.Tests -c Release
 
@@ -72,4 +76,4 @@ jobs:
             "artifacts/OpenPointer-Setup-$v.exe" `
             "artifacts/OpenPointer-$v-portable.zip" `
             "artifacts/SHA256SUMS.txt" `
-            --title "OpenPointer $v" --generate-notes
+            --title "OpenPointer $v" --notes-file "$env:RUNNER_TEMP/notes.md"
