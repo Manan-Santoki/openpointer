@@ -21,10 +21,14 @@ public sealed class RingOverlay : IRingPresenter
     private Window? _window;
     private Canvas? _canvas;
     private readonly List<Border> _items = [];
+    private System.Windows.Shapes.Line? _aimLine;
+    private System.Windows.Shapes.Ellipse? _aimDot;
 
     public void Show(ActionRingAction ring) => Application.Current.Dispatcher.BeginInvoke(() => ShowCore(ring));
 
     public void Highlight(int index) => Application.Current.Dispatcher.BeginInvoke(() => HighlightCore(index));
+
+    public void Aim(double x, double y) => Application.Current.Dispatcher.BeginInvoke(() => AimCore(x, y));
 
     public void Hide() => Application.Current.Dispatcher.BeginInvoke(() => _window?.Hide());
 
@@ -42,7 +46,17 @@ public sealed class RingOverlay : IRingPresenter
         hub.Child = dot;
         Canvas.SetLeft(hub, Size / 2 - 18);
         Canvas.SetTop(hub, Size / 2 - 18);
+
+        // Where the user is aiming: the real cursor is frozen while the button is held.
+        _aimLine = new System.Windows.Shapes.Line { X1 = Size / 2, Y1 = Size / 2, X2 = Size / 2, Y2 = Size / 2, StrokeThickness = 2, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round };
+        _aimLine.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty, "Ring");
+        _aimDot = new System.Windows.Shapes.Ellipse { Width = 12, Height = 12, StrokeThickness = 2 };
+        _aimDot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "Foreground");
+        _aimDot.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty, "Background");
+        _canvas.Children.Add(_aimLine);
         _canvas.Children.Add(hub);
+        _canvas.Children.Add(_aimDot);
+        AimCore(0, 0);
 
         for (var i = 0; i < ring.Items.Count; i++)
         {
@@ -72,6 +86,18 @@ public sealed class RingOverlay : IRingPresenter
         _window!.Left = cursor.X / scale - Size / 2;
         _window.Top = cursor.Y / scale - Size / 2;
         _window.Show();
+    }
+
+    private void AimCore(double x, double y)
+    {
+        if (_aimDot == null || _aimLine == null) return;
+        // Map the aim onto the item circle so the dot lands on the item it selects.
+        var px = Size / 2 + Math.Clamp(x, -1, 1) * Radius;
+        var py = Size / 2 + Math.Clamp(y, -1, 1) * Radius;
+        Canvas.SetLeft(_aimDot, px - 6);
+        Canvas.SetTop(_aimDot, py - 6);
+        _aimLine.X2 = px;
+        _aimLine.Y2 = py;
     }
 
     private void HighlightCore(int index)

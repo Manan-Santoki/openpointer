@@ -19,6 +19,9 @@ public interface IRingPresenter
 {
     void Show(ActionRingAction ring);
     void Highlight(int index);
+
+    /// <summary>Aim position as a fraction of the ring's reach (-1..1 on each axis).</summary>
+    void Aim(double x, double y);
     void Hide();
 }
 
@@ -101,8 +104,8 @@ public sealed class ActionRunner
     private sealed class HeldRing(ActionRingAction ring) : Held
     {
         public ActionRingAction Ring { get; } = ring;
-        public int Dx;
-        public int Dy;
+        public double X;
+        public double Y;
         public int Selected = -1;
     }
 
@@ -243,9 +246,10 @@ public sealed class ActionRunner
                 }
                 else if (held is HeldRing r)
                 {
-                    r.Dx += dx;
-                    r.Dy += dy;
-                    var pick = r.Ring.Pick(r.Dx, r.Dy);
+                    (r.X, r.Y) = r.Ring.Aim(r.X, r.Y, dx, dy);
+                    var reach = (double)Math.Max(r.Ring.Reach, 1);
+                    Ring?.Aim(r.X / reach, r.Y / reach);
+                    var pick = r.Ring.Pick(r.X, r.Y, r.Selected);
                     if (pick != r.Selected)
                     {
                         r.Selected = pick;

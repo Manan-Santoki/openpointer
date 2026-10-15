@@ -233,3 +233,33 @@ public class RingTests
         Assert.Equal(new KeysAction("ctrl+c"), ring.Items[0].Action);
     }
 }
+
+public class RingAimTests
+{
+    private static readonly ActionRingAction Ring = new()
+    {
+        Items = Enumerable.Range(0, 8).Select(i => new RingItem($"{i}", new NoneAction())).ToList(),
+        Threshold = 60,
+        Reach = 180,
+    };
+
+    [Fact]
+    public void AimIsClampedSoReversingRespondsImmediately()
+    {
+        var (x, y) = Ring.Aim(0, 0, 1000, 0);   // big overshoot to the right
+        Assert.Equal(180, x, 3);
+        (x, y) = Ring.Aim(x, y, -360, 0);        // one ring-width back
+        Assert.Equal(-180, x, 3);
+        Assert.Equal(6, Ring.Pick(x, y));        // now pointing left
+    }
+
+    [Fact]
+    public void SelectionHoldsNearSliceBorder()
+    {
+        // 25 degrees clockwise from up: past the 22.5 degree border, but within the 8 degree tolerance.
+        var angle = 25 * Math.PI / 180;
+        var (x, y) = (Math.Sin(angle) * 150, -Math.Cos(angle) * 150);
+        Assert.Equal(1, Ring.Pick(x, y));
+        Assert.Equal(0, Ring.Pick(x, y, current: 0));
+    }
+}

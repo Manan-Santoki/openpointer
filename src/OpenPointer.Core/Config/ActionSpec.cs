@@ -142,8 +142,11 @@ public sealed record ActionRingAction : ActionSpec
 {
     public List<RingItem> Items { get; init; } = [];
 
-    /// <summary>Movement (device counts) before an item is selected.</summary>
-    public int Threshold { get; init; } = 40;
+    /// <summary>Dead zone (device counts) before an item is selected.</summary>
+    public int Threshold { get; init; } = 60;
+
+    /// <summary>Aim is clamped to this radius, so reversing direction responds immediately.</summary>
+    public int Reach { get; init; } = 180;
 
     public override string Describe() => "Actions Ring";
 
@@ -162,15 +165,37 @@ public sealed record ActionRingAction : ActionSpec
         ],
     };
 
-    /// <summary>Index of the item in the direction of (dx, dy), or -1 when the movement is too small.
-    /// Item 0 is straight up; items go clockwise.</summary>
-    public int Pick(int dx, int dy)
+    /// <summary>
+    /// Index of the item in the direction of the aim (x, y), or -1 inside the dead zone. Item 0 is
+    /// straight up; items go clockwise. With a current selection, the aim must cross a slice border
+    /// by a few degrees before the selection changes, so it does not flicker at the edges.
+    /// </summary>
+    public int Pick(double x, double y, int current = -1)
     {
-        if (Items.Count == 0 || Math.Sqrt((double)dx * dx + (double)dy * dy) < Math.Max(1, Threshold)) return -1;
-        var angle = Math.Atan2(dx, -dy); // 0 = up, clockwise positive (screen y grows downward)
+        if (Items.Count == 0 || Math.Sqrt(x * x + y * y) < Math.Max(1, Threshold)) return -1;
+        var angle = Math.Atan2(x, -y); // 0 = up, clockwise positive (screen y grows downward)
         if (angle < 0) angle += 2 * Math.PI;
         var slice = 2 * Math.PI / Items.Count;
-        return (int)Math.Floor((angle + slice / 2) / slice) % Items.Count;
+        var index = (int)Math.Floor((angle + slice / 2) / slice) % Items.Count;
+        if (current >= 0 && current < Items.Count && index != current)
+        {
+            var center = current * slice;
+            var offset = Math.Abs(Math.IEEERemainder(angle - center, 2 * Math.PI));
+            const double hysteresis = 8 * Math.PI / 180;
+            if (offset < slice / 2 + hysteresis) return current;
+        }
+
+        return index;
+    }
+
+    /// <summary>Adds movement to an aim point and clamps it to <see cref="Reach"/>.</summary>
+    public (double X, double Y) Aim(double x, double y, int dx, int dy)
+    {
+        x += dx;
+        y += dy;
+        var length = Math.Sqrt(x * x + y * y);
+        var reach = Math.Max(Reach, Threshold + 1);
+        return length > reach ? (x / length * reach, y / length * reach) : (x, y);
     }
 }
 
