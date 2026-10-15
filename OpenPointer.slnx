@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/OpenPointer.Cli/OpenPointer.Cli.csproj" />
+    <Project Path="src/OpenPointer.Core/OpenPointer.Core.csproj" />
+    <Project Path="src/OpenPointer/OpenPointer.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/OpenPointer.Tests/OpenPointer.Tests.csproj" />
+  </Folder>
+</Solution>

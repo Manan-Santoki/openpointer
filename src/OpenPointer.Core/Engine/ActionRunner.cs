@@ -1,0 +1,281 @@
+using System.Diagnostics;
+using OpenPointer.Config;
+using OpenPointer.Platform;
+
+namespace OpenPointer.Engine;
+
+/// <summary>Device operations that actions can trigger, implemented by the device manager.</summary>
+public interface IDeviceControl
+{
+    Task<int?> GetDpiAsync(ConnectedMouse mouse);
+    Task SetDpiAsync(ConnectedMouse mouse, int dpi, bool persist);
+    IReadOnlyList<int> DpiPresets(ConnectedMouse mouse);
+    Task ToggleWheelModeAsync(ConnectedMouse mouse);
+    Task SwitchHostAsync(ConnectedMouse mouse, int host);
+}
+
+/// <summary>
+/// Executes actions with press/release semantics. A press remembers what it started so the release
+/// ends the same action even if the focused app (and therefore the profile) changed in between.
+/// </summary>
+public sealed class ActionRunner
+{
+    private readonly IDeviceControl _devices;
+    private readonly Dictionary<(ConnectedMouse, ushort), Held> _held = [];
+    private readonly object _sync = new();
+
+    private abstract class Held;
+
+    private sealed class HeldKeys(IReadOnlyList<ushort> keys) : Held
+    {
+        public IReadOnlyList<ushort> Keys { get; } = keys;
+    }
+
+    private sealed class HeldMouse(MouseButtonKind button) : Held
+    {
+        public MouseButtonKind Button { get; } = button;
+    }
+
+    private sealed class HeldGesture(GestureAction gesture) : Held
+    {
+        public GestureAction Gesture { get; } = gesture;
+        public int Dx;
+        public int Dy;
+    }
+
+    private sealed class HeldDpiShift(int restore) : Held
+    {
+        public int Restore { get; } = restore;
+    }
+
+    public ActionRunner(IDeviceControl devices) => _devices = devices;
+
+    /// <summary>Raised when an action fails, for user-visible error reporting.</summary>
+    public event Action<string>? Failed;
+
+    public void Press(ConnectedMouse mouse, ushort cid, ActionSpec action)
+    {
+        Held? held = null;
+        try
+        {
+            switch (action)
+            {
+                case NativeAction:
+                    // The control is diverted but this context wants native behavior (e.g. focus changed
+                    // faster than diversion could be updated). Emulate what the hardware would send.
+                    var native = NativeButtonFor(cid);
+                    if (native != null)
+                    {
+                        InputSynth.MouseButton(native.Value, down: true);
+                        held = new HeldMouse(native.Value);
+                    }
+
+                    break;
+                case KeysAction keys:
+                    var codes = KeyChord.Parse(keys.Keys);
+                    InputSynth.KeyDown(codes);
+                    held = new HeldKeys(codes);
+                    break;
+                case MouseAction m:
+                    InputSynth.MouseButton(m.Button, down: true);
+                    held = new HeldMouse(m.Button);
+                    break;
+                case GestureAction gesture:
+                    held = new HeldGesture(gesture);
+                    break;
+                case DpiAction { Mode: DpiMode.Shift } shift:
+                    held = StartDpiShift(mouse, shift.Value);
+                    break;
+                default:
+                    Fire(mouse, action);
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            Report(action, ex);
+        }
+
+        if (held != null)
+            lock (_sync) _held[(mouse, cid)] = held;
+    }
+
+    public void Release(ConnectedMouse mouse, ushort cid)
+    {
+        Held? held;
+        lock (_sync)
+        {
+            if (!_held.Remove((mouse, cid), out held)) return;
+        }
+
+        try
+        {
+            switch (held)
+            {
+                case HeldKeys keys:
+                    InputSynth.KeyUp(keys.Keys);
+                    break;
+                case HeldMouse m:
+                    InputSynth.MouseButton(m.Button, down: false);
+                    break;
+                case HeldGesture g:
+                    var picked = PickGesture(g);
+                    if (picked != null) Fire(mouse, picked);
+                    break;
+                case HeldDpiShift shift:
+                    _ = _devices.SetDpiAsync(mouse, shift.Restore, persist: false);
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            Failed?.Invoke(ex.Message);
+        }
+    }
+
+    /// <summary>Accumulates raw movement for gestures in progress on this device.</summary>
+    public void Move(ConnectedMouse mouse, int dx, int dy)
+    {
+        lock (_sync)
+        {
+            foreach (var ((owner, _), held) in _held)
+            {
+                if (owner != mouse || held is not HeldGesture g) continue;
+                g.Dx += dx;
+                g.Dy += dy;
+            }
+        }
+    }
+
+    /// <summary>Releases everything held for a device (it disconnected or went to sleep).</summary>
+    public void ReleaseAll(ConnectedMouse mouse)
+    {
+        List<ushort> cids;
+        lock (_sync) cids = _held.Keys.Where(k => k.Item1 == mouse).Select(k => k.Item2).ToList();
+        foreach (var cid in cids) Release(mouse, cid);
+    }
+
+    internal static ActionSpec? PickGesture(GestureAction g, int dx, int dy)
+    {
+        var threshold = Math.Max(1, g.Threshold);
+        if (Math.Abs(dx) < threshold && Math.Abs(dy) < threshold) return g.Tap;
+        if (Math.Abs(dx) >= Math.Abs(dy)) return dx > 0 ? g.Right : g.Left;
+        return dy > 0 ? g.Down : g.Up;
+    }
+
+    private static ActionSpec? PickGesture(HeldGesture g) => PickGesture(g.Gesture, g.Dx, g.Dy);
+
+    private Held? StartDpiShift(ConnectedMouse mouse, int value)
+    {
+        var restore = mouse.Dpi?.Current;
+        if (restore == null) return null;
+        _ = _devices.SetDpiAsync(mouse, value, persist: false);
+        return new HeldDpiShift(restore.Value);
+    }
+
+    /// <summary>Runs a one-shot action (press and release together).</summary>
+    public void Fire(ConnectedMouse mouse, ActionSpec action)
+    {
+        try
+        {
+            switch (action)
+            {
+                case NativeAction or NoneAction:
+                    break;
+                case KeysAction keys:
+                    InputSynth.Tap(keys.Keys);
+                    break;
+                case MouseAction m:
+                    InputSynth.MouseButton(m.Button, down: true);
+                    InputSynth.MouseButton(m.Button, down: false);
+                    break;
+                case ScrollAction s:
+                    InputSynth.Scroll(s.Amount, s.Horizontal);
+                    break;
+                case LaunchAction launch:
+                    Launch(launch);
+                    break;
+                case TextAction text:
+                    InputSynth.TypeText(text.Text);
+                    break;
+                case MacroAction macro:
+                    _ = Task.Run(() => RunMacroAsync(mouse, macro));
+                    break;
+                case GestureAction g:
+                    if (g.Tap != null) Fire(mouse, g.Tap);
+                    break;
+                case DpiAction dpi:
+                    _ = ChangeDpiAsync(mouse, dpi);
+                    break;
+                case WheelModeAction:
+                    _ = _devices.ToggleWheelModeAsync(mouse);
+                    break;
+                case SwitchHostAction host:
+                    _ = _devices.SwitchHostAsync(mouse, host.Host);
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            Report(action, ex);
+        }
+    }
+
+    private async Task RunMacroAsync(ConnectedMouse mouse, MacroAction macro)
+    {
+        foreach (var step in macro.Steps)
+        {
+            if (step.Action is not null and not MacroAction) Fire(mouse, step.Action);
+            if (step.DelayMs > 0) await Task.Delay(step.DelayMs).ConfigureAwait(false);
+        }
+    }
+
+    private async Task ChangeDpiAsync(ConnectedMouse mouse, DpiAction action)
+    {
+        try
+        {
+            if (action.Mode == DpiMode.Set)
+            {
+                await _devices.SetDpiAsync(mouse, action.Value, persist: true).ConfigureAwait(false);
+                return;
+            }
+
+            var presets = action.Values is { Count: > 0 } ? action.Values : _devices.DpiPresets(mouse);
+            if (presets.Count == 0) return;
+            var current = await _devices.GetDpiAsync(mouse).ConfigureAwait(false) ?? presets[0];
+            var next = presets.FirstOrDefault(p => p > current, presets[0]);
+            await _devices.SetDpiAsync(mouse, next, persist: true).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Report(action, ex);
+        }
+    }
+
+    private static void Launch(LaunchAction launch)
+    {
+        var info = new ProcessStartInfo
+        {
+            FileName = Environment.ExpandEnvironmentVariables(launch.Target),
+            Arguments = launch.Arguments ?? "",
+            UseShellExecute = true,
+        };
+        if (!string.IsNullOrWhiteSpace(launch.WorkingDirectory))
+            info.WorkingDirectory = Environment.ExpandEnvironmentVariables(launch.WorkingDirectory);
+        Process.Start(info)?.Dispose();
+    }
+
+    private static MouseButtonKind? NativeButtonFor(ushort cid) => cid switch
+    {
+        0x52 => MouseButtonKind.Middle,
+        0x53 => MouseButtonKind.Back,
+        0x56 => MouseButtonKind.Forward,
+        _ => null,
+    };
+
+    private void Report(ActionSpec action, Exception ex)
+    {
+        Log.Error($"Action \"{action.Describe()}\" failed", ex);
+        Failed?.Invoke($"{action.Describe()}: {ex.Message}");
+    }
+}
