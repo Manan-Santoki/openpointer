@@ -65,10 +65,10 @@ Inno Setup 6.6+ is required (`WizardStyle=modern dynamic`); locally it's from sc
 - **Remapping is temporary.** Controls are remapped with HID++ "temporary diversion", which the device forgets on power cycle or reconnect, so OpenPointer fails safe. `DeviceManager` re-applies on reconnect (receiver 0x41 notifications) and hands controls back on exit.
 - **Remapping follows focus.** Only controls whose action in the focused app's profile isn't `native` are remapped, so native means truly untouched. Gestures and the Actions Ring also request raw XY movement.
 - **Desktop is its own context.** `@desktop` means window class `Progman`/`WorkerW` and `@taskbar` means `Shell_TrayWnd`. Both are separate from `explorer.exe` (File Explorer windows).
-- **Save vs instant:**
-  - Button and profile edits in the window go through `Draft` and the floating Save bar.
-  - Device settings (DPI, scrolling), general settings and cursors apply immediately.
-  - The tray menu writes to the config directly ("on the fly").
+- **One Save for everything in the window:**
+  - All edits (profiles, device settings, general settings, cursors) go through `Draft`, a full clone of the config, and the floating Save bar. `Draft.Save` writes the config, then applies the parts that live outside the mouse: cursors, theme, Windows scroll lines and autostart.
+  - DPI previews live on the device and is reverted by `Draft.Discard`.
+  - Pause remapping and the tray menu are instant. One-off actions (Restore cursors, Reset, Import, Easy-Switch) run immediately after a confirm.
 - **Config:** `%APPDATA%\OpenPointer\config.json`, reloaded live by `ConfigStore`. Actions are polymorphic records with a `type` discriminator. Computed properties need `[JsonIgnore]`.
 - **Cursors:**
   - Packs live in `src/OpenPointer/Assets/Cursors/<id>/pack.json`, shipped as loose files next to the exe (`ExcludeFromSingleFile`).

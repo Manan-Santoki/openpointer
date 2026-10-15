@@ -71,6 +71,9 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
         _ = ReapplyAllAsync(settingsChanged: false);
     }
 
+    /// <summary>Re-applies device settings and the focused app's profile, e.g. after discarding a preview.</summary>
+    public void Reapply() => _ = ReapplyAllAsync(settingsChanged: true);
+
     /// <summary>Asks the monitor loop to look for devices now.</summary>
     public void Rescan() => _scanSignal.Release();
 
@@ -310,6 +313,16 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
             {
                 await device.SetSmartShiftAsync(WheelRatchetMode.Ratchet, threshold).ConfigureAwait(false);
                 mouse.SmartShift = await Safe(device.GetSmartShiftAsync).ConfigureAwait(false);
+            }
+        }
+
+        if (mouse.SmartShift != null && settings.WheelMode is "ratchet" or "freespin")
+        {
+            var mode = settings.WheelMode == "ratchet" ? WheelRatchetMode.Ratchet : WheelRatchetMode.Freespin;
+            if (mouse.SmartShift.Mode != mode)
+            {
+                await device.SetSmartShiftAsync(mode, null).ConfigureAwait(false);
+                mouse.SmartShift = mouse.SmartShift with { Mode = mode };
             }
         }
 

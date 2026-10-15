@@ -16,9 +16,10 @@ public sealed class CursorsPage(MainWindow window) : IPage
 
     public FrameworkElement Render()
     {
-        var general = Services.Config.Current.General;
+        // The draft holds the selection; "In use" shows what Windows has right now.
+        var general = Draft.Current.General;
         var page = new StackPanel();
-        page.Children.Add(PageHeader.Create("Cursors", "Pick a pointer style for all of Windows."));
+        page.Children.Add(PageHeader.Create("Cursors", "Pick a pointer style for all of Windows, then save to apply it."));
 
         var cards = new WrapPanel { Margin = new Thickness(0, 0, -16, 8) };
         cards.Children.Add(StyleCard(null, general));
@@ -46,7 +47,8 @@ public sealed class CursorsPage(MainWindow window) : IPage
     {
         var id = pack?.Id ?? CursorManager.Windows;
         var name = pack?.Name ?? "Windows";
-        var inUse = general.CursorTheme == id;
+        var selected = general.CursorTheme == id;
+        var inUse = Services.Config.Current.General.CursorTheme == id;
         var hasOptions = pack is { HasShadowOption: true } || pack?.SizeKeys.Count > 1;
 
         var stage = new Border { Height = 84, CornerRadius = new CornerRadius(6), Child = Strip(pack, general.CursorShadow, general.CursorSize) };
@@ -94,16 +96,16 @@ public sealed class CursorsPage(MainWindow window) : IPage
             Margin = new Thickness(0, 0, 16, 16),
             Child = body,
             Cursor = Cursors.Hand,
-            BorderThickness = new Thickness(inUse ? 2 : 1),
-            ToolTip = inUse ? null : hasOptions ? $"Set up {name}" : $"Use {name}",
+            BorderThickness = new Thickness(selected ? 2 : 1),
+            ToolTip = selected ? null : hasOptions ? $"Set up {name}" : $"Use {name}",
         };
-        card.SetResourceReference(Border.BorderBrushProperty, inUse ? "Foreground" : "Border");
+        card.SetResourceReference(Border.BorderBrushProperty, selected ? "Foreground" : "Border");
         card.MouseLeftButtonUp += (_, e) =>
         {
             // Clicks on the card's own buttons are handled by them.
             if (e.OriginalSource is DependencyObject source && FindParent<Button>(source) != null) return;
             if (hasOptions) ShowOptions(pack!);
-            else if (!inUse) Apply(id, general.CursorShadow, general.CursorSize);
+            else if (!selected) Apply(id, general.CursorShadow, general.CursorSize);
         };
         return card;
     }
@@ -140,7 +142,7 @@ public sealed class CursorsPage(MainWindow window) : IPage
     /// <summary>Shadow and size for a pack, with a live preview; Apply switches Windows to it.</summary>
     private void ShowOptions(CursorPack pack)
     {
-        var general = Services.Config.Current.General;
+        var general = Draft.Current.General;
         var shadow = general.CursorShadow;
         var size = pack.SizeKeys.Contains(general.CursorSize) ? general.CursorSize : pack.SizeKeys.FirstOrDefault() ?? "normal";
 
@@ -173,10 +175,10 @@ public sealed class CursorsPage(MainWindow window) : IPage
         body.Children.Add(preview);
         body.Children.Add(card);
 
-        var inUse = general.CursorTheme == pack.Id;
+        var selected = general.CursorTheme == pack.Id;
         var dialog = new DialogHost($"{pack.Name} options", $"{pack.Description} · {pack.Attribution}", body, 560);
         dialog.AddButton("Cancel", false, dialog.Close);
-        dialog.AddButton(inUse ? "Apply" : $"Use {pack.Name}", true, () =>
+        dialog.AddButton(selected ? "Done" : $"Use {pack.Name}", true, () =>
         {
             Apply(pack.Id, shadow, size);
             dialog.DialogResult = true;
@@ -185,16 +187,13 @@ public sealed class CursorsPage(MainWindow window) : IPage
     }
 
     /// <summary>Switches Windows to a style right away and remembers the choice.</summary>
-    private static void Apply(string id, bool shadow, string size)
+    /// <summary>Selects a style in the draft; Save switches Windows to it.</summary>
+    private static void Apply(string id, bool shadow, string size) => Draft.Edit(c =>
     {
-        Services.Config.Update(c =>
-        {
-            c.General.CursorTheme = id;
-            c.General.CursorShadow = shadow;
-            c.General.CursorSize = size;
-        });
-        CursorManager.Apply(Services.Config.Current.General);
-    }
+        c.General.CursorTheme = id;
+        c.General.CursorShadow = shadow;
+        c.General.CursorSize = size;
+    });
 
     private StackPanel Strip(CursorPack? pack, bool shadow, string size, double cursorSize = 32)
     {

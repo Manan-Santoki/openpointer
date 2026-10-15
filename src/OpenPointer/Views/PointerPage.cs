@@ -18,7 +18,7 @@ public sealed class PointerPage(MainWindow window) : IPage
     public FrameworkElement Render()
     {
         var page = new StackPanel();
-        page.Children.Add(PageHeader.Create("Pointer & scrolling", "Speed and wheel behavior. Stored on this PC and re-applied when the mouse reconnects."));
+        page.Children.Add(PageHeader.Create("Pointer & scrolling", "Speed and wheel behavior. Pointer speed changes as you move the slider; save to keep it."));
         var mouse = Services.SelectedMouse;
         if (mouse == null)
         {
@@ -32,17 +32,19 @@ public sealed class PointerPage(MainWindow window) : IPage
             page.Children.Add(DpiCard(mouse, dpi));
         }
 
-        var settings = Services.Config.Current.SettingsFor(mouse.Name);
+        // Values shown are the drafted ones; nothing reaches the mouse until Save (DPI previews live).
+        var settings = Draft.Current.SettingsFor(mouse.Name);
         var wheelRows = new List<UIElement>();
 
         // Windows-wide, like Options+ "Scrolling speed".
-        var lines = new Slider { Minimum = 1, Maximum = 12, Value = Math.Clamp(Platform.SystemMouse.ScrollLines, 1, 12), Width = 220, IsSnapToTickEnabled = true, TickFrequency = 1 };
+        var lines = new Slider { Minimum = 1, Maximum = 12, Value = Math.Clamp(Draft.Current.General.ScrollLines ?? 3, 1, 12), Width = 220, IsSnapToTickEnabled = true, TickFrequency = 1 };
         var linesValue = Ui.Text($"{(int)lines.Value}", "MutedText");
         linesValue.Width = 24;
         linesValue.TextAlignment = TextAlignment.Right;
         lines.ValueChanged += (_, e) => linesValue.Text = $"{(int)e.NewValue}";
-        lines.LostMouseCapture += (_, _) => Platform.SystemMouse.ScrollLines = (int)lines.Value;
-        lines.KeyUp += (_, _) => Platform.SystemMouse.ScrollLines = (int)lines.Value;
+        void CommitLines() { if (Draft.Current.General.ScrollLines != (int)lines.Value) Draft.Edit(c => c.General.ScrollLines = (int)lines.Value); }
+        lines.LostMouseCapture += (_, _) => CommitLines();
+        lines.KeyUp += (_, _) => CommitLines();
         var speed = new StackPanel { Orientation = Orientation.Horizontal };
         speed.Children.Add(lines);
         speed.Children.Add(linesValue);
@@ -51,33 +53,43 @@ public sealed class PointerPage(MainWindow window) : IPage
         if (mouse.WheelFlags is { } flags)
         {
             wheelRows.Add(Ui.Row("Smooth scrolling", "High-resolution wheel reporting for finer, smoother scrolling",
-                Ui.Switch((flags & 0x02) != 0, on => UpdateDevice(mouse, s => s.SmoothScroll = on))));
+                Ui.Switch(settings.SmoothScroll ?? (flags & 0x02) != 0, on => Draft.EditDevice(mouse.Name, s => s.SmoothScroll = on))));
             wheelRows.Add(Ui.Row("Natural scrolling", "Reverse the scroll direction",
-                Ui.Switch((flags & 0x04) != 0, on => UpdateDevice(mouse, s => s.InvertScroll = on))));
+                Ui.Switch(settings.InvertScroll ?? (flags & 0x04) != 0, on => Draft.EditDevice(mouse.Name, s => s.InvertScroll = on))));
         }
 
         if (mouse.SmartShift is { } shift)
         {
+            var currentMode = settings.WheelMode ?? (shift.Mode == WheelRatchetMode.Ratchet ? "ratchet" : "freespin");
             var mode = new Border { Style = Ui.Style("SegmentGroup") };
             var modes = new StackPanel { Orientation = Orientation.Horizontal };
-            foreach (var (label, value) in new[] { ("Ratchet", WheelRatchetMode.Ratchet), ("Free spin", WheelRatchetMode.Freespin) })
+            foreach (var (label, value) in new[] { ("Ratchet", "ratchet"), ("Free spin", "freespin") })
             {
-                var segment = new RadioButton { Style = Ui.Style("Segment"), Content = label, GroupName = "wheel-" + mouse.Name, IsChecked = shift.Mode == value };
-                segment.Checked += async (_, _) =>
+                var segment = new RadioButton { Style = Ui.Style("Segment"), Content = label, GroupName = "wheel-" + mouse.Name, IsChecked = currentMode == value };
+                segment.Checked += (_, _) =>
                 {
-                    if (mouse.SmartShift?.Mode != value) await Services.Devices.ToggleWheelModeAsync(mouse);
+                    if (currentMode != value) Draft.EditDevice(mouse.Name, s => s.WheelMode = value);
                 };
                 modes.Children.Add(segment);
             }
 
             mode.Child = modes;
             wheelRows.Add(Ui.Row("Wheel mode", "How the wheel feels when SmartShift is off", mode));
+            var smartShiftOn = settings.SmartShiftEnabled ?? shift.Enabled;
             wheelRows.Add(Ui.Row("SmartShift", "Switch to free spin automatically when you flick the wheel",
-                Ui.Switch(shift.Enabled, on => _ = Services.Devices.SetSmartShiftAsync(mouse, on, settings.SmartShiftThreshold ?? 10))));
-            if (shift.Enabled)
+                Ui.Switch(smartShiftOn, on => Draft.EditDevice(mouse.Name, s =>
+                {
+                    s.SmartShiftEnabled = on;
+                    s.SmartShiftThreshold ??= Math.Clamp(shift.AutoDisengage, 1, 50);
+                }))));
+            if (smartShiftOn)
             {
-                var slider = new Slider { Minimum = 1, Maximum = 50, Value = Math.Clamp(shift.AutoDisengage, 1, 50), Width = 220, IsSnapToTickEnabled = true, TickFrequency = 1 };
-                slider.LostMouseCapture += (_, _) => _ = Services.Devices.SetSmartShiftAsync(mouse, true, (int)slider.Value);
+                var slider = new Slider { Minimum = 1, Maximum = 50, Value = Math.Clamp(settings.SmartShiftThreshold ?? shift.AutoDisengage, 1, 50), Width = 220, IsSnapToTickEnabled = true, TickFrequency = 1 };
+                slider.LostMouseCapture += (_, _) => Draft.EditDevice(mouse.Name, s =>
+                {
+                    s.SmartShiftEnabled = true;
+                    s.SmartShiftThreshold = (int)slider.Value;
+                });
                 wheelRows.Add(Ui.Row("Sensitivity", "Lower switches to free spin more easily", slider));
             }
         }
@@ -85,7 +97,7 @@ public sealed class PointerPage(MainWindow window) : IPage
         if (mouse.HasThumbWheel)
         {
             wheelRows.Add(Ui.Row("Invert thumb wheel", null,
-                Ui.Switch(settings.InvertThumbWheel ?? false, on => UpdateDevice(mouse, s => s.InvertThumbWheel = on))));
+                Ui.Switch(settings.InvertThumbWheel ?? false, on => Draft.EditDevice(mouse.Name, s => s.InvertThumbWheel = on))));
         }
 
         if (wheelRows.Count > 0)
@@ -203,7 +215,7 @@ public sealed class PointerPage(MainWindow window) : IPage
     private void CommitDpi(object? sender, EventArgs e)
     {
         _dpiCommit.Stop();
-        if (_commitTarget != null && _pendingDpi > 0) _ = Services.Devices.SetDpiAsync(_commitTarget, _pendingDpi, persist: true);
+        if (_commitTarget != null && _pendingDpi > 0) Draft.PreviewDpi(_commitTarget, _pendingDpi);
     }
 
     private static int IndexOf(IReadOnlyList<int> steps, int value)
@@ -213,13 +225,6 @@ public sealed class PointerPage(MainWindow window) : IPage
             if (Math.Abs(steps[i] - value) < Math.Abs(steps[best] - value)) best = i;
         return best;
     }
-
-    private static void UpdateDevice(ConnectedMouse mouse, Action<DeviceSettings> change) =>
-        Services.Config.Update(config =>
-        {
-            if (!config.Devices.TryGetValue(mouse.Name, out var settings)) config.Devices[mouse.Name] = settings = new DeviceSettings();
-            change(settings);
-        });
 
     private static TextBlock Value(string text) => Ui.Text(text, "MutedText");
 

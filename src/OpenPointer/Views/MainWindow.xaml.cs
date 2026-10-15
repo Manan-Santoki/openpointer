@@ -244,6 +244,7 @@ public partial class MainWindow : Window
     private void ShowSaveBar(bool show)
     {
         PageHost.Margin = new Thickness(40, 4, 40, show ? 112 : 40);
+        if (show) SaveBarDetail.Text = string.Join("  ·  ", Draft.ChangedAreas()) is { Length: > 0 } areas ? areas : "Save applies everything you changed.";
         if (show == (SaveBar.Visibility == Visibility.Visible)) return;
         if (!show)
         {

@@ -6,6 +6,13 @@ Each release's notes on GitHub are taken from its section here, so add an entry 
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-15
+
+### Changed
+- One Save for everything. Changes anywhere in the window (buttons and apps, pointer speed, scrolling, wheel mode, SmartShift, cursors, appearance, startup and update settings) are kept as pending changes until you click Save, and Discard reverts all of them. The save bar lists what's pending, for example "Buttons & apps · Pointer & scrolling · Cursor".
+- Pointer speed still changes on the mouse as you move the slider so you can feel it, but it goes back if you discard.
+- Pause remapping stays instant, and so does the tray menu.
+
 ## [0.4.4] - 2026-10-14
 
 ### Added
@@ -116,7 +123,8 @@ First build (not published as a release).
 - Fails safe: buttons are remapped only while OpenPointer runs.
 - Detects Logi Options+ and offers to stop it.
 
-[Unreleased]: https://github.com/Manan-Santoki/openpointer/compare/v0.4.4...HEAD
+[Unreleased]: https://github.com/Manan-Santoki/openpointer/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/Manan-Santoki/openpointer/compare/v0.4.4...v0.5.0
 [0.4.4]: https://github.com/Manan-Santoki/openpointer/compare/v0.4.2...v0.4.4
 [0.4.2]: https://github.com/Manan-Santoki/openpointer/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/Manan-Santoki/openpointer/compare/v0.4.0...v0.4.1

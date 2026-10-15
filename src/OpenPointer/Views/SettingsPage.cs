@@ -11,7 +11,7 @@ public sealed class SettingsPage(MainWindow window) : IPage
 {
     public FrameworkElement Render()
     {
-        var config = Services.Config.Current;
+        var config = Draft.Current;
         var page = new StackPanel();
         page.Children.Add(PageHeader.Create("Settings", "How OpenPointer runs on this PC."));
 
@@ -23,8 +23,7 @@ public sealed class SettingsPage(MainWindow window) : IPage
             var segment = new RadioButton { Style = Ui.Style("Segment"), Content = label, GroupName = "theme", IsChecked = config.General.Theme == value };
             segment.Checked += (_, _) =>
             {
-                Services.Config.Update(c => c.General.Theme = value);
-                ThemeManager.Apply(value);
+                if (Draft.Current.General.Theme != value) Draft.Edit(c => c.General.Theme = value);
             };
             themes.Children.Add(segment);
         }
@@ -34,8 +33,8 @@ public sealed class SettingsPage(MainWindow window) : IPage
         [
             Ui.Row("Appearance", null, theme),
             Ui.Row("Start with Windows", "Runs quietly in the tray after you sign in",
-                Ui.Switch(Autostart.IsEnabled(), on => Autostart.Set(on, Services.ExecutablePath))),
-            Ui.Row("Pause remapping", "Hand every button back to the mouse until you turn this off",
+                Ui.Switch(config.General.StartWithWindows ?? Autostart.IsEnabled(), on => Draft.Edit(c => c.General.StartWithWindows = on))),
+            Ui.Row("Pause remapping", "Takes effect immediately: hands every button back to the mouse until you turn it off",
                 Ui.Switch(Services.Devices.Paused, on => Services.Devices.Paused = on)),
         ]));
 
@@ -52,7 +51,7 @@ public sealed class SettingsPage(MainWindow window) : IPage
         [
             Ui.Row("Status", running ? "Running. It competes with OpenPointer for your buttons." : "OpenPointer has full control of your buttons.", status),
             Ui.Row("Warn when it is running", null,
-                Ui.Switch(config.General.WarnAboutOptionsPlus, on => Services.Config.Update(c => c.General.WarnAboutOptionsPlus = on))),
+                Ui.Switch(config.General.WarnAboutOptionsPlus, on => Draft.Edit(c => c.General.WarnAboutOptionsPlus = on))),
         ]));
 
         page.Children.Add(Ui.Section("Updates"));
@@ -65,7 +64,7 @@ public sealed class SettingsPage(MainWindow window) : IPage
         [
             Ui.Row($"Version {UpdateManager.Current.ToString(3)}", updateStatus, updateAction),
             Ui.Row("Check automatically", "Look for a new version every few hours",
-                Ui.Switch(config.General.CheckForUpdates, on => Services.Config.Update(c => c.General.CheckForUpdates = on))),
+                Ui.Switch(config.General.CheckForUpdates, on => Draft.Edit(c => c.General.CheckForUpdates = on))),
         ]));
 
         page.Children.Add(Ui.Section("Configuration", "Everything is stored in one JSON file. Edits are picked up as soon as you save."));

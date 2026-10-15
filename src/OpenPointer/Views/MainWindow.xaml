@@ -102,7 +102,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Margin="0,0,24,0">
                             <TextBlock Text="Unsaved changes" Style="{StaticResource Label}" />
-                            <TextBlock Text="Nothing changes until you save." Style="{StaticResource Caption}" Margin="0,2,0,0" />
+                            <TextBlock x:Name="SaveBarDetail" Style="{StaticResource Caption}" Margin="0,2,0,0" />
                         </StackPanel>
                         <Button Grid.Column="1" Content="Discard" Click="OnDiscard" MinWidth="84" Style="{StaticResource GhostButton}" />
                         <Button Grid.Column="2" Content="Save" Click="OnSave" Style="{StaticResource PrimaryButton}" MinWidth="84" Margin="6,0,0,0" />

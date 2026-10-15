@@ -74,6 +74,12 @@ public sealed class GeneralSettings
 
     /// <summary>macOS cursor size: "normal", "large" or "xlarge".</summary>
     public string CursorSize { get; set; } = "normal";
+
+    /// <summary>Windows wheel lines per notch. Null leaves the Windows setting alone.</summary>
+    public int? ScrollLines { get; set; }
+
+    /// <summary>Run at sign-in. Null leaves the current registration alone.</summary>
+    public bool? StartWithWindows { get; set; }
 }
 
 /// <summary>Hardware settings. Null means "leave whatever the device has".</summary>
@@ -95,6 +101,9 @@ public sealed class DeviceSettings
     public bool? SmoothScroll { get; set; }
     public bool? InvertThumbWheel { get; set; }
 
+    /// <summary>"ratchet" or "freespin" for wheels with a mode shifter. Null leaves the wheel alone.</summary>
+    public string? WheelMode { get; set; }
+
     public DeviceSettings Merge(DeviceSettings over) => new()
     {
         Dpi = over.Dpi ?? Dpi,
@@ -104,6 +113,7 @@ public sealed class DeviceSettings
         InvertScroll = over.InvertScroll ?? InvertScroll,
         SmoothScroll = over.SmoothScroll ?? SmoothScroll,
         InvertThumbWheel = over.InvertThumbWheel ?? InvertThumbWheel,
+        WheelMode = over.WheelMode ?? WheelMode,
     };
 }
 
