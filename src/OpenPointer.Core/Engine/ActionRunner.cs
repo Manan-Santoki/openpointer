@@ -14,6 +14,14 @@ public interface IDeviceControl
     Task SwitchHostAsync(ConnectedMouse mouse, int host);
 }
 
+/// <summary>Draws the Actions Ring; implemented by the UI.</summary>
+public interface IRingPresenter
+{
+    void Show(ActionRingAction ring);
+    void Highlight(int index);
+    void Hide();
+}
+
 /// <summary>
 /// Executes actions with press/release semantics. A press remembers what it started so the release
 /// ends the same action even if the focused app (and therefore the profile) changed in between.
@@ -90,12 +98,23 @@ public sealed class ActionRunner
         public int Dy;
     }
 
+    private sealed class HeldRing(ActionRingAction ring) : Held
+    {
+        public ActionRingAction Ring { get; } = ring;
+        public int Dx;
+        public int Dy;
+        public int Selected = -1;
+    }
+
     private sealed class HeldDpiShift(int restore) : Held
     {
         public int Restore { get; } = restore;
     }
 
     public ActionRunner(IDeviceControl devices) => _devices = devices;
+
+    /// <summary>Set by the UI so rings can be drawn; without it ring actions are ignored.</summary>
+    public IRingPresenter? Ring { get; set; }
 
     /// <summary>Raised when an action fails, for user-visible error reporting.</summary>
     public event Action<string>? Failed;
@@ -147,6 +166,10 @@ public sealed class ActionRunner
                 case GestureAction gesture:
                     held = new HeldGesture(gesture);
                     break;
+                case ActionRingAction ring when Ring != null && ring.Items.Count > 0:
+                    Ring.Show(ring);
+                    held = new HeldRing(ring);
+                    break;
                 case DpiAction { Mode: DpiMode.Shift } shift:
                     held = StartDpiShift(mouse, shift.Value);
                     break;
@@ -193,6 +216,10 @@ public sealed class ActionRunner
                 case HeldDpiShift shift:
                     _ = _devices.SetDpiAsync(mouse, shift.Restore, persist: false);
                     break;
+                case HeldRing ring:
+                    Ring?.Hide();
+                    if (ring.Selected >= 0) Fire(mouse, ring.Ring.Items[ring.Selected].Action);
+                    break;
             }
         }
         catch (Exception ex)
@@ -208,9 +235,23 @@ public sealed class ActionRunner
         {
             foreach (var ((owner, _), held) in _held)
             {
-                if (owner != mouse || held is not HeldGesture g) continue;
-                g.Dx += dx;
-                g.Dy += dy;
+                if (owner != mouse) continue;
+                if (held is HeldGesture g)
+                {
+                    g.Dx += dx;
+                    g.Dy += dy;
+                }
+                else if (held is HeldRing r)
+                {
+                    r.Dx += dx;
+                    r.Dy += dy;
+                    var pick = r.Ring.Pick(r.Dx, r.Dy);
+                    if (pick != r.Selected)
+                    {
+                        r.Selected = pick;
+                        Ring?.Highlight(pick);
+                    }
+                }
             }
         }
     }

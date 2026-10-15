@@ -45,6 +45,7 @@ public sealed class ButtonsPage(MainWindow window) : IPage
             rows.Add(Ui.Row(ButtonNames.Label(button), caption, picker));
 
             if (own is GestureAction gesture) rows.Add(GestureRows(button, gesture));
+            if (own is ActionRingAction ring) rows.Add(RingRows(button, ring));
         }
 
         if (mouse.HasThumbWheel)
@@ -158,6 +159,75 @@ public sealed class ButtonsPage(MainWindow window) : IPage
         box.SetResourceReference(Border.BackgroundProperty, "Muted");
         panel.Children.Add(box);
         return panel;
+    }
+
+    private FrameworkElement RingRows(string button, ActionRingAction ring)
+    {
+        var panel = new StackPanel { Margin = new Thickness(16, 0, 16, 12) };
+        var inner = new StackPanel();
+        for (var i = 0; i < ring.Items.Count; i++)
+        {
+            var index = i;
+            var item = ring.Items[i];
+            var row = new Grid { Height = 44, Margin = new Thickness(12, 0, 6, 0) };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var name = new Button { Style = Ui.Style("GhostButton"), Content = item.Label, HorizontalAlignment = HorizontalAlignment.Left, Padding = new Thickness(8, 0, 8, 0), FontWeight = FontWeights.Normal, ToolTip = "Rename" };
+            name.Click += (_, _) =>
+            {
+                var label = Dialogs.AskText(window, "Rename item", "Shown on the ring.", item.Label);
+                if (label != null) Assign(button, WithItem(ring, index, item with { Label = label.Trim() }));
+            };
+            row.Children.Add(name);
+
+            var picker = SelectButton(ActionCatalog.Label(item.Action), anchor => ActionMenu.ShowDropdown(anchor, item.Action,
+                picked => Assign(button, WithItem(ring, index, item with
+                {
+                    Action = picked ?? new NoneAction(),
+                    // Follow the chosen action's name unless the user renamed the item.
+                    Label = item.Label == ActionCatalog.Label(item.Action) && picked != null ? ActionCatalog.Label(picked) : item.Label,
+                })), allowNative: false));
+            picker.Height = 30;
+            picker.VerticalAlignment = VerticalAlignment.Center;
+            Grid.SetColumn(picker, 1);
+            row.Children.Add(picker);
+
+            var remove = new Button { Style = Ui.Style("IconButton"), Content = Ui.Icon("", 11, "MutedForeground"), ToolTip = "Remove", Margin = new Thickness(4, 0, 0, 0) };
+            remove.Click += (_, _) => Assign(button, ring with { Items = ring.Items.Where((_, n) => n != index).ToList() });
+            Grid.SetColumn(remove, 2);
+            row.Children.Add(remove);
+
+            if (inner.Children.Count > 0) inner.Children.Add(Ui.Divider());
+            inner.Children.Add(row);
+        }
+
+        if (ring.Items.Count < 8)
+        {
+            if (inner.Children.Count > 0) inner.Children.Add(Ui.Divider());
+            var add = Ui.Button("Add item", () =>
+                Assign(button, ring with { Items = [.. ring.Items, new RingItem("Copy", new KeysAction("ctrl+c"))] }), "GhostButton");
+            add.HorizontalAlignment = HorizontalAlignment.Left;
+            add.Margin = new Thickness(10, 6, 0, 6);
+            inner.Children.Add(add);
+        }
+
+        var box = new Border { Style = Ui.Style("Card"), Child = inner };
+        box.SetResourceReference(Border.BackgroundProperty, "Muted");
+        panel.Children.Add(box);
+        var hint = Ui.Text("Hold the button, move toward an item and release. Release without moving to cancel.", "Caption");
+        hint.Margin = new Thickness(2, 8, 0, 0);
+        hint.TextWrapping = TextWrapping.Wrap;
+        panel.Children.Add(hint);
+        return panel;
+    }
+
+    private static ActionRingAction WithItem(ActionRingAction ring, int index, RingItem item)
+    {
+        var items = ring.Items.ToList();
+        items[index] = item;
+        return ring with { Items = items };
     }
 
     private void Assign(string button, ActionSpec? action)

@@ -308,9 +308,11 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
             }
         }
 
-        if (mouse.WheelFlags is { } flags && settings.InvertScroll is { } invert)
+        if (mouse.WheelFlags is { } flags && (settings.InvertScroll != null || settings.SmoothScroll != null))
         {
-            var wanted = invert ? flags | 0x04 : flags & ~0x04;
+            var wanted = flags;
+            if (settings.InvertScroll is { } invert) wanted = invert ? wanted | 0x04 : wanted & ~0x04;
+            if (settings.SmoothScroll is { } smooth) wanted = smooth ? wanted | 0x02 : wanted & ~0x02;
             if (wanted != flags)
             {
                 await device.SetWheelModeAsync(wanted).ConfigureAwait(false);
@@ -330,7 +332,7 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
             foreach (var control in mouse.Device.Controls.Where(c => c.IsDivertable && c.Cid is not (0x50 or 0x51)))
             {
                 var action = _paused ? new NativeAction() : ContextMatcher.ResolveButton(config, context, ButtonNames.FromCid(control.Cid));
-                var wanted = (Divert: action is not NativeAction, Raw: action is GestureAction && control.SupportsRawXY);
+                var wanted = (Divert: action is not NativeAction, Raw: action is GestureAction or ActionRingAction && control.SupportsRawXY);
                 if (control.Flags.HasFlag(ControlFlags.Virtual)) wanted = (false, false);
                 var known = mouse.AppliedDivert.TryGetValue(control.Cid, out var applied);
                 if (known && applied == wanted) continue;

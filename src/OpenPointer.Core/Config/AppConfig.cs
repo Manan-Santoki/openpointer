@@ -81,6 +81,9 @@ public sealed class DeviceSettings
     public int? SmartShiftThreshold { get; set; }
 
     public bool? InvertScroll { get; set; }
+
+    /// <summary>High-resolution (smooth) wheel reporting, on mice whose wheel supports it.</summary>
+    public bool? SmoothScroll { get; set; }
     public bool? InvertThumbWheel { get; set; }
 
     public DeviceSettings Merge(DeviceSettings over) => new()
@@ -90,6 +93,7 @@ public sealed class DeviceSettings
         SmartShiftEnabled = over.SmartShiftEnabled ?? SmartShiftEnabled,
         SmartShiftThreshold = over.SmartShiftThreshold ?? SmartShiftThreshold,
         InvertScroll = over.InvertScroll ?? InvertScroll,
+        SmoothScroll = over.SmoothScroll ?? SmoothScroll,
         InvertThumbWheel = over.InvertThumbWheel ?? InvertThumbWheel,
     };
 }

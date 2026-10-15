@@ -82,6 +82,7 @@ public sealed class SettingsPage(MainWindow window) : IPage
         page.Children.Add(Ui.Card(
         [
             configRow,
+            Ui.Row("Backup", "Save all profiles and settings to a file, or restore them", BackupButtons()),
             Ui.Row("Log", "Useful when something does not work",
                 Ui.Button("Open log", () => Open(Path.Combine(Path.GetDirectoryName(Services.Config.FilePath)!, "openpointer.log")))),
             Ui.Row("Reset", "Restore the default profiles and device settings",
@@ -106,6 +107,40 @@ public sealed class SettingsPage(MainWindow window) : IPage
         about.TextTrimming = TextTrimming.None;
         page.Children.Add(about);
         return page;
+    }
+
+    private StackPanel BackupButtons()
+    {
+        var panel = new StackPanel { Orientation = Orientation.Horizontal };
+        panel.Children.Add(Ui.Button("Export…", () =>
+        {
+            var picker = new Microsoft.Win32.SaveFileDialog { FileName = "openpointer-settings.json", Filter = "OpenPointer settings|*.json" };
+            if (picker.ShowDialog(window) == true) File.WriteAllText(picker.FileName, ConfigStore.Serialize(Services.Config.Current));
+        }));
+        var import = Ui.Button("Import…", () =>
+        {
+            var picker = new Microsoft.Win32.OpenFileDialog { Filter = "OpenPointer settings|*.json|All files|*.*" };
+            if (picker.ShowDialog(window) != true) return;
+            AppConfig imported;
+            try { imported = ConfigStore.Parse(File.ReadAllText(picker.FileName)); }
+            catch (Exception ex)
+            {
+                Dialogs.Confirm(window, "Could not import", $"The file is not valid OpenPointer settings. {ex.Message}", "OK");
+                return;
+            }
+
+            if (!Dialogs.Confirm(window, "Replace your settings?", $"Profiles and device settings are replaced with the {imported.Profiles.Count} profiles in this file.", "Import"))
+                return;
+            Services.Config.Update(c =>
+            {
+                c.Profiles = imported.Profiles;
+                c.Devices = imported.Devices;
+            });
+            Draft.Discard();
+        });
+        import.Margin = new Thickness(8, 0, 0, 0);
+        panel.Children.Add(import);
+        return panel;
     }
 
     private static void Open(string path)

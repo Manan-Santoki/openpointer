@@ -48,6 +48,8 @@ public static class ActionMenu
         {
             target.Items.Add(Ui.MenuItem("Gestures", () => pick(current as GestureAction ?? GestureAction.WindowsDefaults),
                 current is GestureAction, "Hold + move"));
+            target.Items.Add(Ui.MenuItem("Actions Ring", () => pick(current as ActionRingAction ?? ActionRingAction.Defaults),
+                current is ActionRingAction, "Hold + aim"));
         }
 
         if (current is KeysAction held)
@@ -77,6 +79,12 @@ public static class ActionMenu
                 current is LaunchAction la && IsUrl(la.Target) ? la.Target : "https://");
             if (url != null) pick(new LaunchAction(url.Trim()));
         }, current is LaunchAction lu && IsUrl(lu.Target)));
+
+        target.Items.Add(Ui.MenuItem("Macro…", () =>
+        {
+            var macro = Dialogs.EditMacro(ownerResolver?.Invoke(), current as MacroAction);
+            if (macro != null) pick(macro);
+        }, current is MacroAction, current is MacroAction m ? m.Describe() : "Steps in order"));
 
         target.Items.Add(Ui.MenuItem("Type text…", () =>
         {

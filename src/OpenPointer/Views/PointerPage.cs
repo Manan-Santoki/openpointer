@@ -34,8 +34,24 @@ public sealed class PointerPage(MainWindow window) : IPage
 
         var settings = Services.Config.Current.SettingsFor(mouse.Name);
         var wheelRows = new List<UIElement>();
+
+        // Windows-wide, like Options+ "Scrolling speed".
+        var lines = new Slider { Minimum = 1, Maximum = 12, Value = Math.Clamp(Platform.SystemMouse.ScrollLines, 1, 12), Width = 220, IsSnapToTickEnabled = true, TickFrequency = 1 };
+        var linesValue = Ui.Text($"{(int)lines.Value}", "MutedText");
+        linesValue.Width = 24;
+        linesValue.TextAlignment = TextAlignment.Right;
+        lines.ValueChanged += (_, e) => linesValue.Text = $"{(int)e.NewValue}";
+        lines.LostMouseCapture += (_, _) => Platform.SystemMouse.ScrollLines = (int)lines.Value;
+        lines.KeyUp += (_, _) => Platform.SystemMouse.ScrollLines = (int)lines.Value;
+        var speed = new StackPanel { Orientation = Orientation.Horizontal };
+        speed.Children.Add(lines);
+        speed.Children.Add(linesValue);
+        wheelRows.Add(Ui.Row("Scroll speed", "Lines per notch, for every mouse on this PC", speed));
+
         if (mouse.WheelFlags is { } flags)
         {
+            wheelRows.Add(Ui.Row("Smooth scrolling", "High-resolution wheel reporting for finer, smoother scrolling",
+                Ui.Switch((flags & 0x02) != 0, on => UpdateDevice(mouse, s => s.SmoothScroll = on))));
             wheelRows.Add(Ui.Row("Natural scrolling", "Reverse the scroll direction",
                 Ui.Switch((flags & 0x04) != 0, on => UpdateDevice(mouse, s => s.InvertScroll = on))));
         }

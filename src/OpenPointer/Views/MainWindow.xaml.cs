@@ -50,7 +50,7 @@ public partial class MainWindow : Window
         };
         Closing += (_, _) =>
         {
-            if (Draft.IsDirty)
+            if (Draft.IsDirty && !App.IsQuitting)
             {
                 if (Dialogs.Confirm(this, "Save your changes?", "You changed buttons or profiles without saving.", "Save")) Draft.Save();
                 else Draft.Discard();

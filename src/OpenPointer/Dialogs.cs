@@ -191,6 +191,166 @@ public static class Dialogs
         return dialog.ShowFor(owner) ? result : null;
     }
 
+    private enum StepKind { Shortcut, Text, Open, Wait }
+
+    private sealed class StepDraft
+    {
+        public StepKind Kind;
+        public string Value = "";
+    }
+
+    /// <summary>Edits a macro: shortcuts, typed text, launches and waits, run in order.</summary>
+    public static MacroAction? EditMacro(Window? owner, MacroAction? initial)
+    {
+        var steps = initial?.Steps.Select(ToDraft).Where(d => d != null).Select(d => d!).ToList()
+                    ?? [new StepDraft { Kind = StepKind.Shortcut, Value = "ctrl+c" }];
+        var name = new TextBox { Text = initial?.Name ?? "" };
+        var list = new StackPanel();
+        var error = Ui.Text("", "Caption");
+        error.SetResourceReference(TextBlock.ForegroundProperty, "Foreground");
+
+        void Render()
+        {
+            list.Children.Clear();
+            for (var i = 0; i < steps.Count; i++)
+            {
+                var step = steps[i];
+                var index = i;
+                var row = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(24) });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(124) });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                var number = Ui.Text($"{i + 1}", "Caption");
+                number.VerticalAlignment = VerticalAlignment.Center;
+                row.Children.Add(number);
+
+                var kind = Views.ButtonsPage.SelectButton(KindLabel(step.Kind), anchor =>
+                {
+                    var menu = new ContextMenu { PlacementTarget = anchor, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
+                    foreach (var k in Enum.GetValues<StepKind>())
+                    {
+                        var choice = k;
+                        menu.Items.Add(Ui.MenuItem(KindLabel(choice), () =>
+                        {
+                            step.Kind = choice;
+                            step.Value = choice == StepKind.Wait ? "200" : "";
+                            Render();
+                        }, choice == step.Kind));
+                    }
+
+                    menu.IsOpen = true;
+                });
+                kind.MinWidth = 0;
+                kind.Margin = new Thickness(0, 0, 8, 0);
+                Grid.SetColumn(kind, 1);
+                row.Children.Add(kind);
+
+                var value = new TextBox { Text = step.Value, ToolTip = KindHint(step.Kind) };
+                value.TextChanged += (_, _) => step.Value = value.Text;
+                Grid.SetColumn(value, 2);
+                row.Children.Add(value);
+
+                var remove = new Button { Style = Ui.Style("IconButton"), Content = Ui.Icon("", 11, "MutedForeground"), ToolTip = "Remove", Margin = new Thickness(4, 0, 0, 0) };
+                remove.Click += (_, _) =>
+                {
+                    steps.RemoveAt(index);
+                    Render();
+                };
+                Grid.SetColumn(remove, 3);
+                row.Children.Add(remove);
+                list.Children.Add(row);
+            }
+
+            var add = Ui.Button("Add step", () =>
+            {
+                steps.Add(new StepDraft { Kind = StepKind.Shortcut });
+                Render();
+            }, "GhostButton");
+            add.HorizontalAlignment = HorizontalAlignment.Left;
+            list.Children.Add(add);
+        }
+
+        Render();
+        var nameLabel = Ui.Text("Name", "Label");
+        nameLabel.Margin = new Thickness(0, 0, 0, 6);
+        var stepsLabel = Ui.Text("Steps", "Label");
+        stepsLabel.Margin = new Thickness(0, 16, 0, 6);
+        var body = new StackPanel();
+        body.Children.Add(nameLabel);
+        body.Children.Add(name);
+        body.Children.Add(stepsLabel);
+        body.Children.Add(new ScrollViewer { Content = list, MaxHeight = 300, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });
+        body.Children.Add(error);
+
+        MacroAction? result = null;
+        var dialog = new DialogHost("Macro", "Runs each step in order when you press the button. Shortcut steps accept chords like ctrl+shift+t.", body, 560);
+        dialog.AddButton("Cancel", false, dialog.Close);
+        dialog.AddButton("Save", true, () =>
+        {
+            var built = new List<MacroStep>();
+            foreach (var (step, n) in steps.Select((s, n) => (s, n + 1)))
+            {
+                var v = step.Value.Trim();
+                switch (step.Kind)
+                {
+                    case StepKind.Shortcut when KeyChord.TryParse(v.ToLowerInvariant(), out _):
+                        built.Add(new MacroStep(new KeysAction(v.ToLowerInvariant())));
+                        break;
+                    case StepKind.Text when v.Length > 0:
+                        built.Add(new MacroStep(new TextAction(step.Value)));
+                        break;
+                    case StepKind.Open when v.Length > 0:
+                        built.Add(new MacroStep(new LaunchAction(v)));
+                        break;
+                    case StepKind.Wait when int.TryParse(v, out var ms) && ms is > 0 and <= 60000:
+                        built.Add(new MacroStep(DelayMs: ms));
+                        break;
+                    default:
+                        error.Text = $"Step {n}: {KindHint(step.Kind)}";
+                        error.Margin = new Thickness(0, 8, 0, 0);
+                        return;
+                }
+            }
+
+            if (built.Count == 0)
+            {
+                error.Text = "Add at least one step.";
+                return;
+            }
+
+            result = new MacroAction(built, string.IsNullOrWhiteSpace(name.Text) ? null : name.Text.Trim());
+            dialog.DialogResult = true;
+        });
+        return dialog.ShowFor(owner) ? result : null;
+    }
+
+    private static StepDraft? ToDraft(MacroStep step) => step switch
+    {
+        { Action: KeysAction k } => new StepDraft { Kind = StepKind.Shortcut, Value = k.Keys },
+        { Action: TextAction t } => new StepDraft { Kind = StepKind.Text, Value = t.Text },
+        { Action: LaunchAction l } => new StepDraft { Kind = StepKind.Open, Value = l.Target },
+        { Action: null, DelayMs: > 0 } => new StepDraft { Kind = StepKind.Wait, Value = step.DelayMs.ToString() },
+        _ => null,
+    };
+
+    private static string KindLabel(StepKind kind) => kind switch
+    {
+        StepKind.Shortcut => "Shortcut",
+        StepKind.Text => "Type text",
+        StepKind.Open => "Open",
+        _ => "Wait (ms)",
+    };
+
+    private static string KindHint(StepKind kind) => kind switch
+    {
+        StepKind.Shortcut => "enter a shortcut such as ctrl+c or win+d.",
+        StepKind.Text => "enter the text to type.",
+        StepKind.Open => "enter an app, file, folder or URL.",
+        _ => "enter a wait between 1 and 60000 milliseconds.",
+    };
+
     /// <summary>Asks for a line of text.</summary>
     public static string? AskText(Window? owner, string title, string description, string initial = "", string? placeholder = null)
     {

@@ -67,6 +67,7 @@ public partial class App : Application
         ThemeManager.WatchSystem();
 
         var devices = new DeviceManager(config);
+        devices.Runner.Ring = new RingOverlay();
         var focus = new FocusTracker();
         Services.Initialize(config, devices, focus);
 
@@ -137,8 +138,12 @@ public partial class App : Application
         Services.Devices.Rescan();
     }
 
+    /// <summary>True while shutting down; windows must not prompt then (updates, --quit).</summary>
+    public static bool IsQuitting { get; private set; }
+
     public static void Quit()
     {
+        IsQuitting = true;
         Current._tray?.Dispose();
         Services.Devices.Dispose();
         Services.Focus.Dispose();

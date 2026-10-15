@@ -13,6 +13,7 @@ namespace OpenPointer.Config;
 [JsonDerivedType(typeof(TextAction), "text")]
 [JsonDerivedType(typeof(MacroAction), "macro")]
 [JsonDerivedType(typeof(GestureAction), "gesture")]
+[JsonDerivedType(typeof(ActionRingAction), "ring")]
 [JsonDerivedType(typeof(DpiAction), "dpi")]
 [JsonDerivedType(typeof(WheelModeAction), "wheelMode")]
 [JsonDerivedType(typeof(SwitchHostAction), "switchHost")]
@@ -132,6 +133,48 @@ public sealed record GestureAction : ActionSpec
         Right = new KeysAction("ctrl+win+right"),
     };
 }
+
+/// <summary>
+/// Hold the button to show a radial menu at the cursor, move toward an item and release to run it.
+/// Releasing without moving cancels.
+/// </summary>
+public sealed record ActionRingAction : ActionSpec
+{
+    public List<RingItem> Items { get; init; } = [];
+
+    /// <summary>Movement (device counts) before an item is selected.</summary>
+    public int Threshold { get; init; } = 40;
+
+    public override string Describe() => "Actions Ring";
+
+    public static ActionRingAction Defaults => new()
+    {
+        Items =
+        [
+            new RingItem("Copy", new KeysAction("ctrl+c")),
+            new RingItem("Paste", new KeysAction("ctrl+v")),
+            new RingItem("Screenshot", new KeysAction("win+shift+s")),
+            new RingItem("Show desktop", new KeysAction("win+d")),
+            new RingItem("Undo", new KeysAction("ctrl+z")),
+            new RingItem("Task view", new KeysAction("win+tab")),
+            new RingItem("Play / pause", new KeysAction("media_play_pause")),
+            new RingItem("Mute", new KeysAction("volume_mute")),
+        ],
+    };
+
+    /// <summary>Index of the item in the direction of (dx, dy), or -1 when the movement is too small.
+    /// Item 0 is straight up; items go clockwise.</summary>
+    public int Pick(int dx, int dy)
+    {
+        if (Items.Count == 0 || Math.Sqrt((double)dx * dx + (double)dy * dy) < Math.Max(1, Threshold)) return -1;
+        var angle = Math.Atan2(dx, -dy); // 0 = up, clockwise positive (screen y grows downward)
+        if (angle < 0) angle += 2 * Math.PI;
+        var slice = 2 * Math.PI / Items.Count;
+        return (int)Math.Floor((angle + slice / 2) / slice) % Items.Count;
+    }
+}
+
+public sealed record RingItem(string Label, ActionSpec Action);
 
 public enum DpiMode
 {

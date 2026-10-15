@@ -7,8 +7,11 @@ An open-source, customizable alternative to Logi Options+ for Windows. It talks 
 - **Per-app button profiles.** Chrome, File Explorer, the desktop, the taskbar, or any `.exe`. Switches instantly when focus changes.
 - **Actions:** keyboard shortcuts (held while the button is held), mouse buttons, scrolling, launch an app/file/URL, type text, macros, media keys, DPI set/cycle/precision-hold, wheel mode, Easy-Switch.
 - **Gestures:** hold a button and move — tap/up/down/left/right each run their own action.
+- **Actions Ring:** hold a button for a radial menu of up to 8 actions at the cursor; aim and release.
+- **Macros:** multi-step actions (shortcuts, typed text, launches, waits) with an editor.
 - **Pointer speed** with the device's real DPI range, presets, and per-app DPI.
-- **Scrolling:** natural scrolling, SmartShift on/off and sensitivity, ratchet/free spin, thumb wheel remap and invert.
+- **Scrolling:** scroll speed, smooth (high-resolution) scrolling, natural scrolling, SmartShift on/off and sensitivity, ratchet/free spin, thumb wheel remap and invert.
+- **Backup:** export and import all settings as one file.
 - **Battery** in the tray, the window, and a low-battery notification.
 - **Tray menu** to change the focused app's buttons, DPI and wheel mode on the fly.
 - **One JSON file** (`%APPDATA%\OpenPointer\config.json`), reloaded live when edited.

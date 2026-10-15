@@ -202,3 +202,34 @@ public class RepeatTests
         Assert.InRange(interval, 33, 400);
     }
 }
+
+public class RingTests
+{
+    private static ActionRingAction Ring(int count) => new()
+    {
+        Items = Enumerable.Range(0, count).Select(i => new RingItem($"{i}", new KeysAction("ctrl+c"))).ToList(),
+        Threshold = 40,
+    };
+
+    [Theory]
+    [InlineData(0, -100, 0)]   // up
+    [InlineData(100, 0, 2)]    // right
+    [InlineData(0, 100, 4)]    // down
+    [InlineData(-100, 0, 6)]   // left
+    [InlineData(80, -80, 1)]   // up-right
+    [InlineData(-80, -80, 7)]  // up-left
+    public void PicksItemClockwiseFromTop(int dx, int dy, int expected) => Assert.Equal(expected, Ring(8).Pick(dx, dy));
+
+    [Fact]
+    public void SmallMovementSelectsNothing() => Assert.Equal(-1, Ring(8).Pick(10, -20));
+
+    [Fact]
+    public void RingRoundTripsThroughConfig()
+    {
+        var config = new AppConfig { Profiles = [new Profile { Buttons = { ["back"] = ActionRingAction.Defaults } }] };
+        var parsed = ConfigStore.Parse(ConfigStore.Serialize(config));
+        var ring = Assert.IsType<ActionRingAction>(parsed.DefaultProfile.Buttons["back"]);
+        Assert.Equal(8, ring.Items.Count);
+        Assert.Equal(new KeysAction("ctrl+c"), ring.Items[0].Action);
+    }
+}
