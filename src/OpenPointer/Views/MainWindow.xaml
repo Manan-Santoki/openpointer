@@ -12,6 +12,7 @@
 
     <Border x:Name="Frame" BorderBrush="{DynamicResource Border}" BorderThickness="1">
         <Grid>
+        <Grid x:Name="Shell">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="248" />
                 <ColumnDefinition Width="*" />
@@ -82,6 +83,17 @@
                     <ContentControl x:Name="PageHost" Margin="40,4,40,40" MaxWidth="760" HorizontalAlignment="Stretch" Focusable="False" />
                 </ScrollViewer>
             </Grid>
+        </Grid>
+
+        <!-- Modal layer: dims and blurs the shell; dialogs stack in DialogStack. -->
+        <Grid x:Name="OverlayLayer" Visibility="Collapsed">
+            <Rectangle Fill="{DynamicResource Overlay}" />
+            <Grid x:Name="DialogStack" Margin="24,48,24,24" />
+            <!-- Keep the caption buttons usable so the window can still be moved to the back or minimized. -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" WindowChrome.IsHitTestVisibleInChrome="True">
+                <Button Style="{StaticResource CaptionButton}" Content="&#xE921;" Click="OnMinimize" ToolTip="Minimize" />
+            </StackPanel>
+        </Grid>
         </Grid>
     </Border>
 </Window>

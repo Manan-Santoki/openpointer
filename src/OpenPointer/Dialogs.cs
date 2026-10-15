@@ -8,25 +8,18 @@ using OpenPointer.Config;
 
 namespace OpenPointer.App;
 
-/// <summary>A borderless modal card with a title, description, body and footer buttons.</summary>
-public sealed class DialogHost : Window
+/// <summary>
+/// A modal card shown inside the main window over a blurred, disabled background. It belongs to the
+/// window: it moves, minimizes and goes behind other apps together with it.
+/// </summary>
+public sealed class DialogHost : Border
 {
     private readonly StackPanel _footer;
+    private System.Windows.Threading.DispatcherFrame? _frame;
+    private bool? _result;
 
     public DialogHost(string title, string? description, UIElement body, double width = 440)
     {
-        WindowStyle = WindowStyle.None;
-        AllowsTransparency = true;
-        Background = Brushes.Transparent;
-        ResizeMode = ResizeMode.NoResize;
-        SizeToContent = SizeToContent.Height;
-        Width = width + 48;
-        ShowInTaskbar = false;
-        Topmost = true;
-        UseLayoutRounding = true;
-        WindowStartupLocation = WindowStartupLocation.CenterScreen;
-        TextOptions.SetTextFormattingMode(this, TextFormattingMode.Display);
-
         var stack = new StackPanel();
         stack.Children.Add(Ui.Text(title, "Heading", 16));
         if (description != null)
@@ -43,25 +36,40 @@ public sealed class DialogHost : Window
         _footer = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 24, 0, 0) };
         stack.Children.Add(_footer);
 
-        var card = new Border
-        {
-            Style = Ui.Style("Card"),
-            Padding = new Thickness(24),
-            Margin = new Thickness(24),
-            Child = stack,
-            Effect = new DropShadowEffect { BlurRadius = 32, ShadowDepth = 8, Direction = 270, Opacity = 0.35, Color = Colors.Black },
-        };
-        card.SetResourceReference(Border.BackgroundProperty, "Background");
-        card.MouseLeftButtonDown += (_, e) =>
-        {
-            if (e.OriginalSource is Border or StackPanel or TextBlock) DragMove();
-        };
-        Content = card;
+        Style = Ui.Style("Card");
+        Padding = new Thickness(24);
+        Width = width;
+        MaxHeight = 640;
+        Child = stack;
+        HorizontalAlignment = HorizontalAlignment.Center;
+        VerticalAlignment = VerticalAlignment.Center;
+        Effect = new DropShadowEffect { BlurRadius = 32, ShadowDepth = 8, Direction = 270, Opacity = 0.35, Color = Colors.Black };
+        SetResourceReference(BackgroundProperty, "Background");
+        KeyboardNavigation.SetTabNavigation(this, KeyboardNavigationMode.Cycle);
+        KeyboardNavigation.SetControlTabNavigation(this, KeyboardNavigationMode.Cycle);
         PreviewKeyDown += (_, e) =>
         {
-            if (e.Key == Key.Escape) Close();
+            if (e.Key != Key.Escape) return;
+            e.Handled = true;
+            Close();
         };
     }
+
+    /// <summary>The window hosting this dialog, for nested system dialogs.</summary>
+    public Window? HostWindow => Window.GetWindow(this);
+
+    /// <summary>Setting a value closes the dialog with that result, like Window.DialogResult.</summary>
+    public bool? DialogResult
+    {
+        get => _result;
+        set
+        {
+            _result = value;
+            if (_frame != null) _frame.Continue = false;
+        }
+    }
+
+    public void Close() => DialogResult = false;
 
     public Button AddButton(string text, bool primary, Action click)
     {
@@ -73,15 +81,27 @@ public sealed class DialogHost : Window
         return button;
     }
 
+    /// <summary>Shows the dialog in the main window and blocks (pumping messages) until it closes.</summary>
     public bool ShowFor(Window? owner)
     {
-        if (owner is { IsVisible: true })
-        {
-            Owner = owner;
-            WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        }
+        var host = owner as Views.MainWindow ?? App.MainWindowInstance ?? App.ShowMainWindowAndGet();
+        if (!host.IsVisible) host.Show();
+        if (host.WindowState == WindowState.Minimized) host.WindowState = WindowState.Normal;
+        host.Activate();
 
-        return ShowDialog() == true;
+        host.PushDialog(this);
+        _frame = new System.Windows.Threading.DispatcherFrame();
+        Loaded += FocusFirst;
+        System.Windows.Threading.Dispatcher.PushFrame(_frame);
+        host.PopDialog(this);
+        _frame = null;
+        return _result == true;
+    }
+
+    private void FocusFirst(object sender, RoutedEventArgs e)
+    {
+        Loaded -= FocusFirst;
+        if (!IsKeyboardFocusWithin) MoveFocus(new TraversalRequest(FocusNavigationDirection.First));
     }
 }
 
@@ -258,7 +278,10 @@ public static class Dialogs
 
         if (!excluded.Contains(ContextMatcher.Desktop)) Add(new AppChoice(ContextMatcher.Desktop, "Desktop", null), null, "");
         if (!excluded.Contains(ContextMatcher.Taskbar)) Add(new AppChoice(ContextMatcher.Taskbar, "Taskbar", null), null, "");
-        foreach (var app in RunningApps().Where(a => !excluded.Contains(a.Match)))
+        // File Explorer windows live in the shell process, so they never show up as a running app.
+        var explorer = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe");
+        if (!excluded.Contains("explorer.exe")) Add(new AppChoice("explorer.exe", "File Explorer", explorer), Ui.ExecutableIcon(explorer), null);
+        foreach (var app in RunningApps().Where(a => !excluded.Contains(a.Match) && a.Match != "explorer.exe"))
             Add(app, Ui.ExecutableIcon(app.ExecutablePath), null);
 
         var scroller = new ScrollViewer { Content = list, MaxHeight = 360, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
@@ -267,7 +290,7 @@ public static class Dialogs
         dialog = new DialogHost("Add application", "Pick a running app. Its profile switches on when the app is focused.", frame, 480);
         dialog.AddButton("Browse…", false, () =>
         {
-            var path = AskExecutable(dialog);
+            var path = AskExecutable(dialog.HostWindow);
             if (path == null || !path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) return;
             result = new AppChoice(Path.GetFileName(path).ToLowerInvariant(), FriendlyName(path), path);
             dialog.DialogResult = true;
@@ -284,11 +307,11 @@ public static class Dialogs
         {
             try
             {
-                if (process.Id == own || process.MainWindowHandle == 0) continue;
+                if (process.Id == own || process.MainWindowHandle == 0 || string.IsNullOrWhiteSpace(process.MainWindowTitle)) continue;
+                if (!IsWindowVisible(process.MainWindowHandle) || HiddenProcesses.Contains(process.ProcessName)) continue;
                 string? path = null;
                 try { path = process.MainModule?.FileName; } catch { }
                 var match = (path != null ? Path.GetFileName(path) : process.ProcessName + ".exe").ToLowerInvariant();
-                if (match is "applicationframehost.exe" or "textinputhost.exe" or "explorer.exe" && path == null) continue;
                 apps.TryAdd(match, new AppChoice(match, path != null ? FriendlyName(path) : process.ProcessName, path));
             }
             catch
@@ -303,6 +326,17 @@ public static class Dialogs
 
         return apps.Values.OrderBy(a => a.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
     }
+
+    // Background hosts that own invisible or helper windows.
+    private static readonly HashSet<string> HiddenProcesses = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "svchost", "textinputhost", "applicationframehost", "shellexperiencehost", "startmenuexperiencehost",
+        "searchhost", "searchapp", "lockapp", "dwm", "ctfmon", "sihost", "runtimebroker", "systemsettingsbroker",
+        "powertoys.quickaccess", "nvidia share", "nvcontainer", "gamebar", "gamebarftserver", "widgets", "logioptionsplus",
+    };
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool IsWindowVisible(nint hWnd);
 
     public static string FriendlyName(string path)
     {

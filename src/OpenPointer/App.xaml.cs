@@ -56,6 +56,7 @@ public partial class App : Application
 
         config.Watch();
         ThemeManager.Apply(config.Current.General.Theme);
+        SmoothScroll.Register();
         ThemeManager.WatchSystem();
 
         var devices = new DeviceManager(config);
@@ -95,6 +96,14 @@ public partial class App : Application
 
         if (config.Current.General.WarnAboutOptionsPlus && OptionsPlus.IsRunning())
             _tray.Balloon("Logi Options+ is running", "It overrides button remapping. Stop it from the tray menu.");
+    }
+
+    public static MainWindow? MainWindowInstance => _main;
+
+    public static MainWindow ShowMainWindowAndGet()
+    {
+        ShowMainWindow();
+        return _main!;
     }
 
     public static void ShowMainWindow()

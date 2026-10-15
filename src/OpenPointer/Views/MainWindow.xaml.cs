@@ -46,6 +46,11 @@ public partial class MainWindow : Window
             Frame.Margin = WindowState == WindowState.Maximized ? new Thickness(7) : new Thickness(0);
             MaximizeButton.Content = WindowState == WindowState.Maximized ? "" : "";
         };
+        Closing += (_, _) =>
+        {
+            // Closing the window cancels any open dialogs so their callers unwind.
+            foreach (var dialog in _dialogs.ToList()) dialog.Close();
+        };
         Closed += (_, _) =>
         {
             _poll.Stop();
@@ -152,6 +157,34 @@ public partial class MainWindow : Window
     {
         App.StopOptionsPlus(this);
         UpdateBanner();
+    }
+
+    private readonly List<DialogHost> _dialogs = [];
+
+    /// <summary>Shows a dialog on top of the window, blurring and disabling everything behind it.</summary>
+    public void PushDialog(DialogHost dialog)
+    {
+        if (_dialogs.Count > 0) _dialogs[^1].Visibility = Visibility.Hidden;
+        _dialogs.Add(dialog);
+        DialogStack.Children.Add(dialog);
+        OverlayLayer.Visibility = Visibility.Visible;
+        Shell.IsEnabled = false;
+        Shell.Effect ??= new System.Windows.Media.Effects.BlurEffect { Radius = 8, KernelType = System.Windows.Media.Effects.KernelType.Gaussian };
+    }
+
+    public void PopDialog(DialogHost dialog)
+    {
+        _dialogs.Remove(dialog);
+        DialogStack.Children.Remove(dialog);
+        if (_dialogs.Count > 0)
+        {
+            _dialogs[^1].Visibility = Visibility.Visible;
+            return;
+        }
+
+        OverlayLayer.Visibility = Visibility.Collapsed;
+        Shell.IsEnabled = true;
+        Shell.Effect = null;
     }
 
     private void OnMinimize(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
