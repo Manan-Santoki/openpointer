@@ -425,7 +425,10 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
         return mouse.Dpi?.Current;
     }
 
-    public async Task SetDpiAsync(ConnectedMouse mouse, int dpi, bool persist)
+    public Task SetDpiAsync(ConnectedMouse mouse, int dpi, bool persist) => SetDpiAsync(mouse, dpi, persist, notify: true);
+
+    /// <param name="notify">False for live previews, so the UI is not rebuilt mid-drag.</param>
+    public async Task SetDpiAsync(ConnectedMouse mouse, int dpi, bool persist, bool notify)
     {
         await SetDpiCoreAsync(mouse, dpi).ConfigureAwait(false);
         if (persist)
@@ -438,7 +441,7 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
             });
         }
 
-        StateChanged?.Invoke();
+        if (notify) StateChanged?.Invoke();
     }
 
     private async Task SetDpiCoreAsync(ConnectedMouse mouse, int dpi)

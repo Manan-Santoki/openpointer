@@ -62,7 +62,7 @@ public sealed class ApplicationsPage(MainWindow window) : IPage
         var actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         if (!isDefault)
         {
-            var toggle = Ui.Switch(profile.Enabled, on => Draft.Edit(c => c.Profiles[index].Enabled = on));
+            var toggle = Ui.Switch(profile.Enabled, on => Draft.Edit(c => c.Profiles[index].Enabled = on, rerender: false));
             toggle.Margin = new Thickness(0, 0, 12, 0);
             toggle.ToolTip = profile.Enabled ? "Profile is on" : "Profile is off";
             actions.Children.Add(toggle);

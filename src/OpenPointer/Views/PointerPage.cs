@@ -42,7 +42,7 @@ public sealed class PointerPage(MainWindow window) : IPage
         linesValue.Width = 24;
         linesValue.TextAlignment = TextAlignment.Right;
         lines.ValueChanged += (_, e) => linesValue.Text = $"{(int)e.NewValue}";
-        void CommitLines() { if (Draft.Current.General.ScrollLines != (int)lines.Value) Draft.Edit(c => c.General.ScrollLines = (int)lines.Value); }
+        void CommitLines() { if (Draft.Current.General.ScrollLines != (int)lines.Value) Draft.Edit(c => c.General.ScrollLines = (int)lines.Value, rerender: false); }
         lines.LostMouseCapture += (_, _) => CommitLines();
         lines.KeyUp += (_, _) => CommitLines();
         var speed = new StackPanel { Orientation = Orientation.Horizontal };
@@ -53,9 +53,9 @@ public sealed class PointerPage(MainWindow window) : IPage
         if (mouse.WheelFlags is { } flags)
         {
             wheelRows.Add(Ui.Row("Smooth scrolling", "High-resolution wheel reporting for finer, smoother scrolling",
-                Ui.Switch(settings.SmoothScroll ?? (flags & 0x02) != 0, on => Draft.EditDevice(mouse.Name, s => s.SmoothScroll = on))));
+                Ui.Switch(settings.SmoothScroll ?? (flags & 0x02) != 0, on => Draft.EditDevice(mouse.Name, s => s.SmoothScroll = on, rerender: false))));
             wheelRows.Add(Ui.Row("Natural scrolling", "Reverse the scroll direction",
-                Ui.Switch(settings.InvertScroll ?? (flags & 0x04) != 0, on => Draft.EditDevice(mouse.Name, s => s.InvertScroll = on))));
+                Ui.Switch(settings.InvertScroll ?? (flags & 0x04) != 0, on => Draft.EditDevice(mouse.Name, s => s.InvertScroll = on, rerender: false))));
         }
 
         if (mouse.SmartShift is { } shift)
@@ -68,7 +68,7 @@ public sealed class PointerPage(MainWindow window) : IPage
                 var segment = new RadioButton { Style = Ui.Style("Segment"), Content = label, GroupName = "wheel-" + mouse.Name, IsChecked = currentMode == value };
                 segment.Checked += (_, _) =>
                 {
-                    if (currentMode != value) Draft.EditDevice(mouse.Name, s => s.WheelMode = value);
+                    if (Draft.Current.SettingsFor(mouse.Name).WheelMode != value) Draft.EditDevice(mouse.Name, s => s.WheelMode = value, rerender: false);
                 };
                 modes.Children.Add(segment);
             }
@@ -89,7 +89,7 @@ public sealed class PointerPage(MainWindow window) : IPage
                 {
                     s.SmartShiftEnabled = true;
                     s.SmartShiftThreshold = (int)slider.Value;
-                });
+                }, rerender: false);
                 wheelRows.Add(Ui.Row("Sensitivity", "Lower switches to free spin more easily", slider));
             }
         }
@@ -97,7 +97,7 @@ public sealed class PointerPage(MainWindow window) : IPage
         if (mouse.HasThumbWheel)
         {
             wheelRows.Add(Ui.Row("Invert thumb wheel", null,
-                Ui.Switch(settings.InvertThumbWheel ?? false, on => Draft.EditDevice(mouse.Name, s => s.InvertThumbWheel = on))));
+                Ui.Switch(settings.InvertThumbWheel ?? false, on => Draft.EditDevice(mouse.Name, s => s.InvertThumbWheel = on, rerender: false))));
         }
 
         if (wheelRows.Count > 0)
@@ -202,6 +202,13 @@ public sealed class PointerPage(MainWindow window) : IPage
             chip.Click += (_, _) => slider.Value = Math.Max(0, IndexOf(steps, target));
             chips.Children.Add(chip);
         }
+
+        // The preset highlight follows the slider without rebuilding the page.
+        slider.ValueChanged += (_, e) =>
+        {
+            var chosen = steps[(int)Math.Round(e.NewValue)].ToString();
+            foreach (Button chip in chips.Children) chip.Tag = chip.Content as string == chosen;
+        };
 
         var stack = new StackPanel { Margin = new Thickness(16) };
         stack.Children.Add(top);

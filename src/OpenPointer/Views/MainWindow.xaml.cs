@@ -234,10 +234,10 @@ public partial class MainWindow : Window
         foreach (var dialog in _dialogs.ToList()) dialog.Close();
     }
 
-    private void OnDraftChanged()
+    private void OnDraftChanged(bool rerender)
     {
         ShowSaveBar(Draft.IsDirty);
-        Render();
+        if (rerender) Render();
     }
 
     /// <summary>Slides the floating save bar in or out and keeps page content clear of it.</summary>

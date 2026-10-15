@@ -6,6 +6,11 @@ Each release's notes on GitHub are taken from its section here, so add an entry 
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-15
+
+### Fixed
+- Sliders and switches no longer flicker. Moving a slider or flipping a switch rebuilt the whole page, and the live pointer-speed preview rebuilt it again, so the control was replaced under the pointer. Now only the save bar updates, and the DPI preset highlight follows the slider.
+
 ## [0.5.0] - 2026-10-15
 
 ### Changed
@@ -123,7 +128,8 @@ First build (not published as a release).
 - Fails safe: buttons are remapped only while OpenPointer runs.
 - Detects Logi Options+ and offers to stop it.
 
-[Unreleased]: https://github.com/Manan-Santoki/openpointer/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/Manan-Santoki/openpointer/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/Manan-Santoki/openpointer/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/Manan-Santoki/openpointer/compare/v0.4.4...v0.5.0
 [0.4.4]: https://github.com/Manan-Santoki/openpointer/compare/v0.4.2...v0.4.4
 [0.4.2]: https://github.com/Manan-Santoki/openpointer/compare/v0.4.1...v0.4.2

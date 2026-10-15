@@ -20,8 +20,12 @@ public static class Draft
 
     public static bool IsDirty => Snapshot(Current) != _baseline;
 
-    /// <summary>Raised on the UI thread after the draft changes or is saved/discarded.</summary>
-    public static event Action? Changed;
+    /// <summary>
+    /// Raised on the UI thread after the draft changes or is saved/discarded. The argument says
+    /// whether pages must rebuild; edits from sliders and switches already show their new state,
+    /// and rebuilding under the user's pointer makes them flicker.
+    /// </summary>
+    public static event Action<bool>? Changed;
 
     public static void Initialize()
     {
@@ -31,29 +35,29 @@ public static class Draft
             // Follow outside changes (tray, hand edits) unless the user has edits in progress.
             if (IsDirty) return;
             Reset(config);
-            Changed?.Invoke();
+            Changed?.Invoke(true);
         });
     }
 
-    public static void Edit(Action<AppConfig> change)
+    public static void Edit(Action<AppConfig> change, bool rerender = true)
     {
         change(Current);
-        Changed?.Invoke();
+        Changed?.Invoke(rerender);
     }
 
     /// <summary>Edits the draft settings of one device.</summary>
-    public static void EditDevice(string deviceName, Action<DeviceSettings> change) => Edit(config =>
+    public static void EditDevice(string deviceName, Action<DeviceSettings> change, bool rerender = true) => Edit(config =>
     {
         if (!config.Devices.TryGetValue(deviceName, out var settings)) config.Devices[deviceName] = settings = new DeviceSettings();
         change(settings);
-    });
+    }, rerender);
 
     /// <summary>Feels the new pointer speed right away; it is kept on Save and reverted on Discard.</summary>
     public static void PreviewDpi(ConnectedMouse mouse, int dpi)
     {
         if (mouse.Dpi is { } current) PreviewedDpi.TryAdd(mouse, current.Current);
-        _ = Services.Devices.SetDpiAsync(mouse, dpi, persist: false);
-        EditDevice(mouse.Name, s => s.Dpi = dpi);
+        _ = Services.Devices.SetDpiAsync(mouse, dpi, persist: false, notify: false);
+        EditDevice(mouse.Name, s => s.Dpi = dpi, rerender: false);
     }
 
     public static void Save()
@@ -79,7 +83,7 @@ public static class Draft
 
         PreviewedDpi.Clear();
         Reset(Services.Config.Current);
-        Changed?.Invoke();
+        Changed?.Invoke(true);
     }
 
     public static void Discard()
@@ -88,7 +92,7 @@ public static class Draft
         PreviewedDpi.Clear();
         Reset(Services.Config.Current);
         Services.Devices.Reapply();
-        Changed?.Invoke();
+        Changed?.Invoke(true);
     }
 
     private static void Reset(AppConfig config)
