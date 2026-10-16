@@ -29,9 +29,24 @@ public sealed class SettingsPage(MainWindow window) : IPage
         }
 
         theme.Child = themes;
+
+        var speed = new Border { Style = Ui.Style("SegmentGroup") };
+        var speeds = new StackPanel { Orientation = Orientation.Horizontal };
+        foreach (var (label, value) in new[] { ("Fast", 200), ("Normal", 300), ("Slow", 450) })
+        {
+            var segment = new RadioButton { Style = Ui.Style("Segment"), Content = label, GroupName = "multipress", IsChecked = config.General.MultiPressMs == value };
+            segment.Checked += (_, _) =>
+            {
+                if (Draft.Current.General.MultiPressMs != value) Draft.Edit(c => c.General.MultiPressMs = value, rerender: false);
+            };
+            speeds.Children.Add(segment);
+        }
+
+        speed.Child = speeds;
         page.Children.Add(Ui.Card(
         [
             Ui.Row("Appearance", null, theme),
+            Ui.Row("Double-press speed", "How quickly presses must follow each other to count as a double or triple press", speed),
             Ui.Row("Start with Windows", "Runs quietly in the tray after you sign in",
                 Ui.Switch(config.General.StartWithWindows ?? Autostart.IsEnabled(), on => Draft.Edit(c => c.General.StartWithWindows = on, rerender: false))),
             Ui.Row("Pause remapping", "Takes effect immediately: hands every button back to the mouse until you turn it off",

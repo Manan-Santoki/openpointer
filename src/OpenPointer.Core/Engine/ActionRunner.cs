@@ -101,13 +101,23 @@ public sealed class ActionRunner
         public int Dy;
     }
 
-    private sealed class HeldRing(ActionRingAction ring) : Held
+    private sealed class HeldRing(ActionRingAction ring, double scale) : Held
     {
         public ActionRingAction Ring { get; } = ring;
+
+        /// <summary>Converts device counts to counts at 1000 DPI, so the ring feels the same at any DPI.</summary>
+        public double Scale { get; } = scale;
+        public long Started { get; } = Environment.TickCount64;
         public double X;
         public double Y;
         public int Selected = -1;
     }
+
+    /// <summary>Movement right after the press is the button going down, not aiming.</summary>
+    private const int RingSettleMs = 120;
+
+    /// <summary>A release this soon after the press is a click: it closes the ring without running anything.</summary>
+    private const int RingClickMs = 200;
 
     private sealed class HeldDpiShift(int restore) : Held
     {
@@ -171,7 +181,7 @@ public sealed class ActionRunner
                     break;
                 case ActionRingAction ring when Ring != null && ring.Items.Count > 0:
                     Ring.Show(ring);
-                    held = new HeldRing(ring);
+                    held = new HeldRing(ring, mouse.Dpi?.Current is > 0 and var dpi ? 1000.0 / dpi : 1);
                     break;
                 case DpiAction { Mode: DpiMode.Shift } shift:
                     held = StartDpiShift(mouse, shift.Value);
@@ -221,7 +231,7 @@ public sealed class ActionRunner
                     break;
                 case HeldRing ring:
                     Ring?.Hide();
-                    if (ring.Selected >= 0) Fire(mouse, ring.Ring.Items[ring.Selected].Action);
+                    if (ring.Selected >= 0 && Environment.TickCount64 - ring.Started >= RingClickMs) Fire(mouse, ring.Ring.Items[ring.Selected].Action);
                     break;
             }
         }
@@ -246,7 +256,8 @@ public sealed class ActionRunner
                 }
                 else if (held is HeldRing r)
                 {
-                    (r.X, r.Y) = r.Ring.Aim(r.X, r.Y, dx, dy);
+                    if (Environment.TickCount64 - r.Started < RingSettleMs) continue;
+                    (r.X, r.Y) = r.Ring.Aim(r.X, r.Y, dx * r.Scale, dy * r.Scale);
                     var reach = (double)Math.Max(r.Ring.Reach, 1);
                     Ring?.Aim(r.X / reach, r.Y / reach);
                     var pick = r.Ring.Pick(r.X, r.Y, r.Selected);

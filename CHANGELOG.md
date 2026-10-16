@@ -6,6 +6,16 @@ Each release's notes on GitHub are taken from its section here, so add an entry 
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-15
+
+### Added
+- **Double and triple press.** Give the back, forward or middle button a separate action for pressing it twice or three times: open the button's menu and choose **Double & triple press…**. App profiles inherit these from All applications and can turn them off with **Off**. Buttons without them still respond instantly.
+- **Double-press speed** in Settings (Fast, Normal, Slow) sets how long OpenPointer waits for another press.
+- The Actions Ring editor shows a map of the ring, and an arrow on each item points to where it sits. Hover an item to highlight it on the map.
+
+### Fixed
+- The Actions Ring no longer picks an item by itself. The small movement as the button goes down is ignored, the dead zone is larger and scales with DPI, and a quick click closes the ring without running anything.
+
 ## [0.6.0] - 2026-10-15
 
 ### Added
@@ -139,7 +149,8 @@ First build (not published as a release).
 - Fails safe: buttons are remapped only while OpenPointer runs.
 - Detects Logi Options+ and offers to stop it.
 
-[Unreleased]: https://github.com/Manan-Santoki/openpointer/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/Manan-Santoki/openpointer/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/Manan-Santoki/openpointer/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/Manan-Santoki/openpointer/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/Manan-Santoki/openpointer/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/Manan-Santoki/openpointer/compare/v0.4.4...v0.5.0

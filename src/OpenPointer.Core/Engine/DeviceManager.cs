@@ -18,6 +18,9 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
     private readonly List<HidppTransport> _transports = [];
     private readonly ConcurrentDictionary<(HidppTransport, byte), ConnectedMouse> _mice = new();
     private readonly BlockingCollection<Action> _actionQueue = new();
+
+    /// <summary>Double and triple press tracking per button; used only on the action thread.</summary>
+    private readonly Dictionary<(ConnectedMouse, ushort), PressCounter> _counters = [];
     private readonly SemaphoreSlim _scanSignal = new(0);
     private readonly CancellationTokenSource _stop = new();
     private readonly object _transportSync = new();
@@ -151,7 +154,7 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
     {
         var device = mouse.Device;
         device.ButtonDown += cid => _actionQueue.Add(() => OnButtonDown(mouse, cid));
-        device.ButtonUp += cid => _actionQueue.Add(() => Runner.Release(mouse, cid));
+        device.ButtonUp += cid => _actionQueue.Add(() => OnButtonUp(mouse, cid));
         device.RawMove += (dx, dy) => Runner.Move(mouse, dx, dy);
         device.ThumbWheel += (rotation, phase) => _actionQueue.Add(() => OnThumbWheel(mouse, rotation, phase));
     }
@@ -166,10 +169,75 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
 
         var context = FocusTracker.Snapshot();
         var button = ButtonNames.FromCid(cid);
-        var action = ContextMatcher.ResolveButton(_config.Current, context, button);
+        var presses = ContextMatcher.ResolvePresses(_config.Current, context, button);
+        var counter = Counter(mouse, cid);
+        if (!counter.Busy && presses.Skip(1).All(p => p == null))
+        {
+            LogPress(button, 1, presses[0]!);
+            Runner.Press(mouse, cid, presses[0]!);
+            return;
+        }
+
+        var outcome = counter.Down(presses, out var wait);
+        if (wait) ScheduleExpiry(mouse, cid, counter);
+        Run(mouse, cid, outcome);
+    }
+
+    private void OnButtonUp(ConnectedMouse mouse, ushort cid)
+    {
+        if (!_counters.TryGetValue((mouse, cid), out var counter) || !counter.Busy)
+        {
+            Runner.Release(mouse, cid);
+            return;
+        }
+
+        var outcome = counter.Up(out var wait);
+        if (wait) ScheduleExpiry(mouse, cid, counter);
+        Run(mouse, cid, outcome);
+    }
+
+    private PressCounter Counter(ConnectedMouse mouse, ushort cid)
+    {
+        if (!_counters.TryGetValue((mouse, cid), out var counter)) _counters[(mouse, cid)] = counter = new PressCounter();
+        return counter;
+    }
+
+    /// <summary>Calls <see cref="PressCounter.Expire"/> on the action thread once the multi-press delay passes.</summary>
+    private void ScheduleExpiry(ConnectedMouse mouse, ushort cid, PressCounter counter)
+    {
+        var generation = counter.Generation;
+        var delay = Math.Clamp(_config.Current.General.MultiPressMs, 150, 800);
+        _ = Task.Delay(delay).ContinueWith(_ =>
+        {
+            if (!_actionQueue.IsAddingCompleted) _actionQueue.TryAdd(() => Run(mouse, cid, counter.Expire(generation)));
+        }, TaskScheduler.Default);
+    }
+
+    private void Run(ConnectedMouse mouse, ushort cid, PressOutcome? outcome)
+    {
+        switch (outcome)
+        {
+            case PressOutcome.Hold hold:
+                LogPress(ButtonNames.FromCid(cid), hold.Count, hold.Action);
+                Runner.Press(mouse, cid, hold.Action);
+                break;
+            case PressOutcome.Tap tap:
+                LogPress(ButtonNames.FromCid(cid), tap.Count, tap.Action);
+                Runner.Press(mouse, cid, tap.Action);
+                Runner.Release(mouse, cid);
+                break;
+            case PressOutcome.End:
+                Runner.Release(mouse, cid);
+                break;
+        }
+    }
+
+    private void LogPress(string button, int count, ActionSpec action)
+    {
+        var context = FocusTracker.Snapshot();
         var profile = ContextMatcher.FindAppProfile(_config.Current, context)?.Name ?? "All applications";
-        Log.Info($"{button} pressed in {context.DisplayName} [{context.ProcessName}/{context.WindowClass}] -> {profile}: {action.Describe()}");
-        Runner.Press(mouse, cid, action);
+        var times = count switch { 1 => "pressed", 2 => "pressed twice", _ => $"pressed {count} times" };
+        Log.Info($"{button} {times} in {context.DisplayName} [{context.ProcessName}/{context.WindowClass}] -> {profile}: {action.Describe()}");
     }
 
     private void OnThumbWheel(ConnectedMouse mouse, int rotation, ThumbWheelPhase phase)
@@ -350,8 +418,9 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
             var context = _focus;
             foreach (var control in mouse.Device.Controls.Where(c => c.IsDivertable && c.Cid is not (0x50 or 0x51)))
             {
-                var action = _paused ? new NativeAction() : ContextMatcher.ResolveButton(config, context, ButtonNames.FromCid(control.Cid));
-                var wanted = (Divert: action is not NativeAction, Raw: action is GestureAction or ActionRingAction && control.SupportsRawXY);
+                var presses = _paused ? new ActionSpec?[] { new NativeAction() } : ContextMatcher.ResolvePresses(config, context, ButtonNames.FromCid(control.Cid));
+                var action = presses[0];
+                var wanted = (Divert: presses.Any(p => p is not null and not NativeAction), Raw: action is GestureAction or ActionRingAction && control.SupportsRawXY);
                 if (control.Flags.HasFlag(ControlFlags.Virtual)) wanted = (false, false);
                 var known = mouse.AppliedDivert.TryGetValue(control.Cid, out var applied);
                 if (known && applied == wanted) continue;

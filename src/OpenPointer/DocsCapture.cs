@@ -18,7 +18,8 @@ public static class DocsCapture
     public static async Task RunAsync(string directory)
     {
         Directory.CreateDirectory(directory);
-        var config = new ConfigStore();
+        // OPENPOINTER_CONFIG renders another config file, e.g. one set up to show a feature.
+        var config = new ConfigStore(Environment.GetEnvironmentVariable("OPENPOINTER_CONFIG") is { Length: > 0 } path ? path : null);
         config.Load();
         ThemeManager.Apply(config.Current.General.Theme);
         var devices = new DeviceManager(config, passive: true);

@@ -80,6 +80,9 @@ public sealed class GeneralSettings
 
     /// <summary>Run at sign-in. Null leaves the current registration alone.</summary>
     public bool? StartWithWindows { get; set; }
+
+    /// <summary>How long to wait for another press when a button has double or triple press actions.</summary>
+    public int MultiPressMs { get; set; } = 300;
 }
 
 /// <summary>Hardware settings. Null means "leave whatever the device has".</summary>
@@ -180,6 +183,12 @@ public static class ButtonNames
         ByName.FirstOrDefault(kv => kv.Value == cid).Key ?? $"cid:{cid:X4}";
 
     public static string Label(string name) => Labels.TryGetValue(name, out var label) ? label : $"Control {name[4..]}";
+
+    /// <summary>Most presses in a row a button can be given its own action for.</summary>
+    public const int MaxPresses = 3;
+
+    /// <summary>Profile key for pressing a button several times in a row: "back", "back:2", "back:3".</summary>
+    public static string Presses(string button, int count) => count <= 1 ? button : $"{button}:{count}";
 
     /// <summary>Controls worth showing to users: physical, divertable, not left/right click.</summary>
     public static bool IsUserFacing(Hidpp.ButtonControl control) =>

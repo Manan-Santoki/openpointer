@@ -14,7 +14,8 @@ public static class ActionMenu
     /// <param name="allowGestures">Offer gestures (the control reports movement while held).</param>
     /// <param name="ownerResolver">Window for dialogs; null shows them centered on screen.</param>
     public static void Populate(ItemsControl target, ActionSpec current, Action<ActionSpec?> pick,
-        string? inheritLabel = null, bool allowGestures = false, bool allowNative = true, Func<Window?>? ownerResolver = null)
+        string? inheritLabel = null, bool allowGestures = false, bool allowNative = true, Func<Window?>? ownerResolver = null,
+        string nativeLabel = "Default")
     {
         target.Items.Clear();
         var isOverride = inheritLabel != null;
@@ -26,7 +27,7 @@ public static class ActionMenu
         }
 
         if (allowNative)
-            target.Items.Add(Ui.MenuItem("Default", () => pick(new NativeAction()), current is NativeAction, "Built-in"));
+            target.Items.Add(Ui.MenuItem(nativeLabel, () => pick(new NativeAction()), current is NativeAction, nativeLabel == "Default" ? "Built-in" : null));
 
         foreach (var group in ActionCatalog.Groups)
         {
@@ -108,11 +109,14 @@ public static class ActionMenu
         target.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || target.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Opens the picker as a dropdown under a control.</summary>
+    /// <param name="extend">Adds page-specific items at the end of the menu.</param>
     public static void ShowDropdown(FrameworkElement anchor, ActionSpec current, Action<ActionSpec?> pick,
-        string? inheritLabel = null, bool allowGestures = false, bool allowNative = true)
+        string? inheritLabel = null, bool allowGestures = false, bool allowNative = true,
+        string nativeLabel = "Default", Action<ContextMenu>? extend = null)
     {
         var menu = new ContextMenu { PlacementTarget = anchor, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
-        Populate(menu, current, pick, inheritLabel, allowGestures, allowNative, () => Window.GetWindow(anchor));
+        Populate(menu, current, pick, inheritLabel, allowGestures, allowNative, () => Window.GetWindow(anchor), nativeLabel);
+        extend?.Invoke(menu);
         menu.IsOpen = true;
     }
 }

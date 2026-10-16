@@ -263,3 +263,96 @@ public class RingAimTests
         Assert.Equal(0, Ring.Pick(x, y, current: 0));
     }
 }
+
+public class PressCounterTests
+{
+    private static readonly ActionSpec Single = new KeysAction("a");
+    private static readonly ActionSpec Double = new KeysAction("b");
+    private static readonly ActionSpec Triple = new KeysAction("c");
+
+    [Fact]
+    public void WithoutLaterPressesTheButtonRunsImmediately()
+    {
+        var counter = new PressCounter();
+        var outcome = counter.Down([Single, null, null], out var wait);
+        Assert.False(wait);
+        Assert.Equal(new PressOutcome.Hold(Single, 1), outcome);
+        Assert.IsType<PressOutcome.End>(counter.Up(out _));
+        Assert.False(counter.Busy);
+    }
+
+    [Fact]
+    public void SingleClickWaitsThenTaps()
+    {
+        var counter = new PressCounter();
+        Assert.Null(counter.Down([Single, Double, null], out var wait));
+        Assert.True(wait);
+        Assert.Null(counter.Up(out wait));
+        Assert.True(wait);
+        Assert.Equal(new PressOutcome.Tap(Single, 1), counter.Expire(counter.Generation));
+        Assert.False(counter.Busy);
+    }
+
+    [Fact]
+    public void SecondPressRunsTheDoublePressRightAwayWhenItIsTheLast()
+    {
+        var counter = new PressCounter();
+        ActionSpec?[] presses = [Single, Double, null];
+        counter.Down(presses, out _);
+        var stale = counter.Generation;
+        counter.Up(out _);
+        Assert.Equal(new PressOutcome.Hold(Double, 2), counter.Down(presses, out var wait));
+        Assert.False(wait);
+        Assert.Null(counter.Expire(stale));
+        Assert.IsType<PressOutcome.End>(counter.Up(out _));
+    }
+
+    [Fact]
+    public void HoldingPastTheDelayStartsAHold()
+    {
+        var counter = new PressCounter();
+        counter.Down([Single, Double, Triple], out _);
+        Assert.Equal(new PressOutcome.Hold(Single, 1), counter.Expire(counter.Generation));
+        Assert.IsType<PressOutcome.End>(counter.Up(out var wait));
+        Assert.False(wait);
+    }
+
+    [Fact]
+    public void DoubleClickWaitsForAThirdPress()
+    {
+        var counter = new PressCounter();
+        ActionSpec?[] presses = [Single, Double, Triple];
+        counter.Down(presses, out _);
+        counter.Up(out _);
+        counter.Down(presses, out _);
+        counter.Up(out _);
+        Assert.Equal(new PressOutcome.Tap(Double, 2), counter.Expire(counter.Generation));
+    }
+
+    [Fact]
+    public void MissingDoubleFallsBackToSingle()
+    {
+        var counter = new PressCounter();
+        ActionSpec?[] presses = [Single, null, Triple];
+        counter.Down(presses, out _);
+        counter.Up(out _);
+        counter.Down(presses, out _);
+        counter.Up(out _);
+        Assert.Equal(new PressOutcome.Tap(Single, 2), counter.Expire(counter.Generation));
+    }
+
+    [Fact]
+    public void ProfilesInheritAndCanTurnOffDoublePress()
+    {
+        var config = new AppConfig
+        {
+            Profiles =
+            [
+                new Profile { Buttons = { ["back"] = new NativeAction(), ["back:2"] = Double } },
+                new Profile { Name = "Chrome", Match = ["chrome.exe"], Buttons = { ["back:2"] = new NativeAction() } },
+            ],
+        };
+        Assert.Equal(Double, ContextMatcher.ResolvePresses(config, new FocusContext("code.exe", "", ""), "back")[1]);
+        Assert.Null(ContextMatcher.ResolvePresses(config, new FocusContext("chrome.exe", "", ""), "back")[1]);
+    }
+}

@@ -24,6 +24,7 @@ dotnet run --project src/OpenPointer         # run from source
 - **UI:** `OpenPointer.exe --capture-docs <dir>` renders every page plus a sample dialog to 2× PNGs.
   - It runs a *passive* DeviceManager that never remaps controls, so it's safe next to a running instance.
   - Use `OPENPOINTER_CAPTURE_HEIGHT=1500` for tall pages.
+  - Set `OPENPOINTER_CONFIG=<path to a config.json copy>` to render a modified config without touching the real one.
   - Prefer this to screenshotting the live window: the user may be using it, and UI Automation leaves focus rings.
 - **Runtime log:** `%APPDATA%\OpenPointer\openpointer.log` records every button press (focused app → profile → action) and every remapping change.
 

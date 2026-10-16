@@ -57,6 +57,23 @@ public static class ContextMatcher
         return config.DefaultProfile.Buttons.TryGetValue(button, out var fallback) ? fallback : new NativeAction();
     }
 
+    /// <summary>
+    /// Actions for pressing a button 1, 2 or 3 times in a row. Index 0 is the single press; later
+    /// entries are null when not set (a profile can store Default to turn off an inherited one).
+    /// </summary>
+    public static ActionSpec?[] ResolvePresses(AppConfig config, FocusContext context, string button)
+    {
+        var presses = new ActionSpec?[ButtonNames.MaxPresses];
+        presses[0] = ResolveButton(config, context, button);
+        for (var count = 2; count <= ButtonNames.MaxPresses; count++)
+        {
+            var action = ResolveButton(config, context, ButtonNames.Presses(button, count));
+            presses[count - 1] = action is NativeAction ? null : action;
+        }
+
+        return presses;
+    }
+
     public static (ActionSpec? Left, ActionSpec? Right) ResolveThumbWheel(AppConfig config, FocusContext context)
     {
         var app = FindAppProfile(config, context);

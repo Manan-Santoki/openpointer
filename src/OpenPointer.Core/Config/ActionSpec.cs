@@ -146,8 +146,15 @@ public sealed record ActionRingAction : ActionSpec
 {
     public List<RingItem> Items { get; init; } = [];
 
-    /// <summary>Dead zone (device counts) before an item is selected.</summary>
-    public int Threshold { get; init; } = 60;
+    /// <summary>Dead zone (counts at 1000 DPI) before an item is selected.</summary>
+    public int Threshold { get; init; } = 90;
+
+    /// <summary>
+    /// The dead zone in use. Never below 90: the mouse shifts a little as the button goes down,
+    /// and a smaller dead zone turned that into a selection.
+    /// </summary>
+    [JsonIgnore]
+    public double DeadZone => Math.Max(Threshold, 90);
 
     /// <summary>Aim is clamped to this radius, so reversing direction responds immediately.</summary>
     public int Reach { get; init; } = 180;
@@ -176,7 +183,7 @@ public sealed record ActionRingAction : ActionSpec
     /// </summary>
     public int Pick(double x, double y, int current = -1)
     {
-        if (Items.Count == 0 || Math.Sqrt(x * x + y * y) < Math.Max(1, Threshold)) return -1;
+        if (Items.Count == 0 || Math.Sqrt(x * x + y * y) < DeadZone) return -1;
         var angle = Math.Atan2(x, -y); // 0 = up, clockwise positive (screen y grows downward)
         if (angle < 0) angle += 2 * Math.PI;
         var slice = 2 * Math.PI / Items.Count;
@@ -193,12 +200,12 @@ public sealed record ActionRingAction : ActionSpec
     }
 
     /// <summary>Adds movement to an aim point and clamps it to <see cref="Reach"/>.</summary>
-    public (double X, double Y) Aim(double x, double y, int dx, int dy)
+    public (double X, double Y) Aim(double x, double y, double dx, double dy)
     {
         x += dx;
         y += dy;
         var length = Math.Sqrt(x * x + y * y);
-        var reach = Math.Max(Reach, Threshold + 1);
+        var reach = Math.Max(Reach, DeadZone * 1.5);
         return length > reach ? (x / length * reach, y / length * reach) : (x, y);
     }
 }
