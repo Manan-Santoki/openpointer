@@ -56,11 +56,8 @@ public static class WindowsMouseDiscovery
                 var info = new DeviceInfo { Size = (uint)Marshal.SizeOf<DeviceInfo>() };
                 var size = info.Size;
                 if (GetRawInputDeviceInfo(device.Handle, 0x2000000B, ref info, ref size) == uint.MaxValue) continue;
-                uint chars = 0;
-                if (GetRawInputDeviceName(device.Handle, 0x20000007, null, ref chars) == uint.MaxValue || chars == 0) continue;
-                var path = new StringBuilder((int)chars);
-                if (GetRawInputDeviceName(device.Handle, 0x20000007, path, ref chars) == uint.MaxValue) continue;
-                result.Add(Describe(path.ToString(), (int)info.Buttons) with { ButtonMask = ReadButtonMask(device.Handle) });
+                if (DeviceName(device.Handle) is not { } path) continue;
+                result.Add(Describe(path, (int)info.Buttons) with { ButtonMask = ReadButtonMask(device.Handle) });
             }
 
             var mouseInterfaces = result.Select(m => Hidpp.HidppTransport.InterfaceKey(m.DevicePath)).ToHashSet();
@@ -88,6 +85,15 @@ public static class WindowsMouseDiscovery
         throw new Win32Exception(122, "Mouse devices kept changing during enumeration.");
     }
 
+    /// <summary>The interface path of a raw input device, as used for <see cref="WindowsMouseInfo.DevicePath"/>.</summary>
+    internal static string? DeviceName(nint device)
+    {
+        uint chars = 0;
+        if (GetRawInputDeviceName(device, 0x20000007, null, ref chars) == uint.MaxValue || chars == 0) return null;
+        var path = new StringBuilder((int)chars);
+        return GetRawInputDeviceName(device, 0x20000007, path, ref chars) == uint.MaxValue ? null : path.ToString();
+    }
+
     private static WindowsMouseInfo Describe(string path, int buttons)
     {
         var name = "Windows mouse";
@@ -106,6 +112,8 @@ public static class WindowsMouseDiscovery
                 if (CM_Get_Device_IDW(node, id, id.Capacity, 0) == 0)
                 {
                     nodeId = id.ToString();
+                    // Above the device sit host controllers ("PCI Device") whose names are not the mouse's.
+                    if (nodeId.StartsWith("PCI\\", StringComparison.OrdinalIgnoreCase)) { builtIn |= !usb && !bluetooth; break; }
                     bluetooth |= nodeId.StartsWith("BTH", StringComparison.OrdinalIgnoreCase);
                     usb |= nodeId.StartsWith("USB\\", StringComparison.OrdinalIgnoreCase);
                     builtIn |= nodeId.StartsWith("ACPI\\", StringComparison.OrdinalIgnoreCase);

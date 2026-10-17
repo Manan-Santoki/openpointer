@@ -30,12 +30,23 @@ public sealed class ConnectedMouse
     public bool HasThumbWheel { get; internal set; }
     public int? WheelFlags { get; internal set; }
 
+    /// <summary>
+    /// Buttons Windows has seen this standard mouse press, or null when presses can't be attributed
+    /// to a device and every reported button is shown.
+    /// </summary>
+    internal IReadOnlySet<string>? SeenButtons { get; set; }
+
     /// <summary>Buttons the user can remap, by config name, top of the mouse first (forward sits above back).</summary>
     public IReadOnlyList<string> Buttons =>
-        WindowsDevice?.Buttons ?? Device!.Controls.Where(ButtonNames.IsUserFacing)
+        WindowsDevice?.Buttons.Where(IsConfirmed).ToList() ?? Device!.Controls.Where(ButtonNames.IsUserFacing)
             .Select(c => ButtonNames.FromCid(c.Cid))
             .OrderBy(name => Array.IndexOf(DisplayOrder, name) is var i && i >= 0 ? i : DisplayOrder.Length)
             .ToList();
+
+    /// <summary>Side buttons the mouse reports but has not pressed yet; often ones it doesn't physically have.</summary>
+    public IReadOnlyList<string> UnconfirmedButtons => WindowsDevice?.Buttons.Where(b => !IsConfirmed(b)).ToList() ?? [];
+
+    private bool IsConfirmed(string button) => button == ButtonNames.Middle || SeenButtons?.Contains(button) != false;
 
     private static readonly string[] DisplayOrder =
         [ButtonNames.Middle, ButtonNames.Forward, ButtonNames.Back, ButtonNames.Gesture, ButtonNames.WheelMode];

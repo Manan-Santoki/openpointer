@@ -71,11 +71,16 @@ public sealed class ButtonsPage(MainWindow window) : IPage
         }
 
         if (rows.Count > 0) page.Children.Add(Ui.Card(rows));
-        else page.Children.Add(EmptyState.Create("", "No extra buttons", "This mouse reports no middle or side buttons. Left and right click stay native."));
+        else page.Children.Add(EmptyState.Create("", "No extra buttons", mouse.UnconfirmedButtons.Count > 0
+            ? "Press this mouse's side buttons once and they appear here. Left and right click stay native."
+            : "This mouse reports no middle or side buttons. Left and right click stay native."));
         if (mouse.IsStandardMouse)
         {
+            var pending = mouse.UnconfirmedButtons.Count > 0 && rows.Count > 0
+                ? " Side buttons appear here after you press them once, since many mice report buttons they don't have."
+                : "";
             var support = Ui.Text(Services.Devices.WindowsRemappingAvailable
-                ? "Standard button mappings apply to all mice on this PC. Left and right click stay native. Only buttons reported by Windows are shown."
+                ? "Standard button mappings apply to all mice on this PC. Left and right click stay native." + pending
                 : "Windows button remapping could not start. Quit and reopen OpenPointer; device detection and Windows scroll settings are still available.", "Caption");
             support.TextWrapping = TextWrapping.Wrap;
             support.Margin = new Thickness(0, 8, 0, 8);
