@@ -1,6 +1,6 @@
 # OpenPointer: notes for agents and maintainers
 
-Open-source Logi Options+ alternative for Windows. A WPF tray app talks to Logitech mice over HID++ 2.0 (HidSharp). User docs are in README.md; contributor docs are in CONTRIBUTING.md. This file covers how to build, verify and ship.
+Open-source mouse customization for Windows. A WPF tray app supports standard Bluetooth, USB and wireless mice through Windows input, with additional HID++ 2.0 hardware controls for Logitech mice (HidSharp). User docs are in README.md; contributor docs are in CONTRIBUTING.md. This file covers how to build, verify and ship.
 
 ## Build, run, test
 
@@ -62,6 +62,9 @@ artifacts\OpenPointer-Setup-X.Y.Z.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
 Inno Setup 6.6+ is required (`WizardStyle=modern dynamic`); locally it's from scoop `extras/inno-setup`. A silent install quits the running app gracefully (`PrepareToInstall` → `--quit`) and relaunches it with `--background`. Don't use PowerShell `Start-Process -Wait` on the installer: it also waits for the relaunched app and hangs.
 
 ## Architecture notes
+
+- **Two mouse backends.** Standard mice use `WindowsMouseDiscovery` for identity and HID button capabilities, and a dedicated `WindowsMouseHook` thread for the shared Windows input stream. `WindowsMouseRouter` ignores injected input and preserves intercepted press/release pairs. The hook cannot select a physical source mouse, so standard mappings apply across mice. Logitech HID++ devices retain direct hardware control and replace the generic entry for the same physical device.
+- **Touchpads are opt-in.** A sibling HID Touch Pad collection identifies their legacy mouse interfaces. They are hidden unless both `General.DeveloperMode` and `General.ShowTouchpads` are enabled. These settings use Draft and Save like other settings.
 
 - **Remapping is temporary.** Controls are remapped with HID++ "temporary diversion", which the device forgets on power cycle or reconnect, so OpenPointer fails safe. `DeviceManager` re-applies on reconnect (receiver 0x41 notifications) and hands controls back on exit.
 - **Remapping follows focus.** Only controls whose action in the focused app's profile isn't `native` are remapped, so native means truly untouched. Gestures and the Actions Ring also request raw XY movement.

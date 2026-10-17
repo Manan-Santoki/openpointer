@@ -3,7 +3,7 @@
 [![Latest release](https://img.shields.io/github/v/release/Manan-Santoki/openpointer)](https://github.com/Manan-Santoki/openpointer/releases/latest)
 [![License: MIT](https://img.shields.io/github/license/Manan-Santoki/openpointer)](LICENSE)
 
-OpenPointer is an open-source mouse customization app for Windows. Remap buttons per app, run macros and use gestures with Bluetooth, USB and wireless mice from any brand. Supported Logitech HID++ 2.0 mice also get DPI, SmartShift, battery and other hardware controls. There's no account, cloud sync or telemetry involved.
+OpenPointer is an open-source mouse customization app for Windows. Remap buttons per app, run macros and use gestures with Bluetooth, USB and wireless mice from any brand. There's no account, cloud sync or telemetry involved.
 
 I started it because I wanted the side buttons on my mouse to do different things on the desktop than in File Explorer, and to keep changing the volume while I hold a button.
 
