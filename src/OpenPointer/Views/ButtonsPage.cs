@@ -25,7 +25,7 @@ public sealed class ButtonsPage(MainWindow window) : IPage
 
         if (mouse == null)
         {
-            page.Children.Add(EmptyState.Create("", "No mouse connected", "Turn on your mouse, or plug in its receiver. OpenPointer finds it automatically."));
+            page.Children.Add(EmptyState.Create("", "No mouse connected", "Connect a mouse by Bluetooth, USB or its wireless receiver. OpenPointer finds it automatically."));
             return page;
         }
 
@@ -70,7 +70,17 @@ public sealed class ButtonsPage(MainWindow window) : IPage
                 anchor => ActionMenu.ShowDropdown(anchor, right ?? new NativeAction(), a => AssignThumb(left: false, a)))));
         }
 
-        page.Children.Add(Ui.Card(rows));
+        if (rows.Count > 0) page.Children.Add(Ui.Card(rows));
+        else page.Children.Add(EmptyState.Create("", "No extra buttons", "This mouse reports no middle or side buttons. Left and right click stay native."));
+        if (mouse.IsStandardMouse)
+        {
+            var support = Ui.Text(Services.Devices.WindowsRemappingAvailable
+                ? "Standard button mappings apply to all mice on this PC. Left and right click stay native. Only buttons reported by Windows are shown."
+                : "Windows button remapping could not start. Quit and reopen OpenPointer; device detection and Windows scroll settings are still available.", "Caption");
+            support.TextWrapping = TextWrapping.Wrap;
+            support.Margin = new Thickness(0, 8, 0, 8);
+            page.Children.Add(support);
+        }
         var note = Ui.Text(mouse.Online
             ? "Save to apply your changes. Buttons return to normal when OpenPointer quits."
             : $"{mouse.Name} is asleep. Changes apply when it wakes up.", "Caption");

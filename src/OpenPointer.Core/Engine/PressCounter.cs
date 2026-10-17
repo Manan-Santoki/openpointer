@@ -35,6 +35,15 @@ public sealed class PressCounter
     /// <summary>A press sequence is in progress (waiting for more presses, or holding).</summary>
     public bool Busy => _count > 0 || _holding;
 
+    /// <summary>Cancels delayed actions when input is paused, a device disconnects or the app exits.</summary>
+    public void Reset()
+    {
+        Generation++;
+        _count = 0;
+        _down = _holding = false;
+        _presses = [];
+    }
+
     /// <param name="presses">Actions for 1..n presses, from <see cref="ContextMatcher.ResolvePresses"/>; used only when no sequence is in progress.</param>
     /// <param name="wait">Set when the owner must call <see cref="Expire"/> with <see cref="Generation"/> after the multi-press delay.</param>
     public PressOutcome? Down(ActionSpec?[] presses, out bool wait)

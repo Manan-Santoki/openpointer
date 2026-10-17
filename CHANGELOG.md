@@ -6,6 +6,17 @@ Each release's notes on GitHub are taken from its section here, so add an entry 
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-17
+
+### Added
+- Standard Windows mouse support for Bluetooth, USB and wireless mice from any brand, including three-button mice such as the Lenovo 600 Bluetooth Silent Mouse. Remap middle and available side buttons with per-app profiles, shortcuts, macros, gestures, the Actions Ring, and double/triple presses.
+- Device details explain which settings are available. Standard Windows button mappings apply across mice; hardware DPI, battery, special wheel settings and host switching still require device-specific support.
+- `openpointer-cli devices` lists Windows mice, connection types and reported buttons without opening HID++ connections.
+
+### Fixed
+- Device discovery keeps checking for newly connected mice even when a Logitech receiver is already open.
+- Pausing, disconnecting or quitting cancels pending presses and releases held actions without firing a gesture or ring action.
+
 ## [0.7.0] - 2026-10-15
 
 ### Added
@@ -149,7 +160,8 @@ First build (not published as a release).
 - Fails safe: buttons are remapped only while OpenPointer runs.
 - Detects Logi Options+ and offers to stop it.
 
-[Unreleased]: https://github.com/Manan-Santoki/openpointer/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/Manan-Santoki/openpointer/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/Manan-Santoki/openpointer/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/Manan-Santoki/openpointer/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/Manan-Santoki/openpointer/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/Manan-Santoki/openpointer/compare/v0.5.0...v0.5.1

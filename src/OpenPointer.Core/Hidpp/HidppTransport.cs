@@ -60,7 +60,7 @@ public sealed class HidppTransport : IDisposable
     ];
 
     /// <summary>Finds every Logitech HID++ endpoint currently attached.</summary>
-    public static List<HidppTransport> OpenAll(Action<string>? log = null)
+    public static List<HidppTransport> OpenAll(Action<string>? log = null, ISet<string>? excludedPaths = null)
     {
         var candidates = DeviceList.Local.GetHidDevices(VendorLogitech).ToList();
         var longs = candidates.Where(d => SafeLength(d, input: true) == HidppMessage.LongLength &&
@@ -73,6 +73,7 @@ public sealed class HidppTransport : IDisposable
         var result = new List<HidppTransport>();
         foreach (var longDevice in longs)
         {
+            if (excludedPaths?.Contains(longDevice.DevicePath) == true) continue;
             if (!longDevice.TryOpen(out var longStream))
             {
                 log?.Invoke($"Could not open {longDevice.DevicePath}");

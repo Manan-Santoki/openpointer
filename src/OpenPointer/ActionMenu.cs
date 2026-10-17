@@ -31,9 +31,11 @@ public static class ActionMenu
 
         foreach (var group in ActionCatalog.Groups)
         {
+            var entries = group.Entries.Where(e => Services.SelectedMouse?.SupportsAction(e.Action) != false).ToArray();
+            if (entries.Length == 0) continue;
             var sub = new MenuItem { Header = group.Name };
             var any = false;
-            foreach (var entry in group.Entries)
+            foreach (var entry in entries)
             {
                 var selected = entry.Action == current ||
                                (current is KeysAction ck && entry.Action is KeysAction ek && ek.Keys == ck.Keys);

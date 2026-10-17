@@ -87,7 +87,7 @@ public sealed class TrayIcon : IDisposable
 
         if (mice.Count == 0)
         {
-            menu.Items.Add(Ui.MenuLabel(Header("No device", "Looking for Logitech receivers…", null)));
+            menu.Items.Add(Ui.MenuLabel(Header("No device", "Looking for Bluetooth, USB and wireless mice…", null)));
         }
 
         foreach (var mouse in mice)

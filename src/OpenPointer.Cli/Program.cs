@@ -6,12 +6,20 @@
 //   openpointer-cli dpi <value>       set DPI
 
 var command = args.Length > 0 ? args[0] : "dump";
+var windowsMice = OpenPointer.Platform.WindowsMouseDiscovery.Enumerate();
+Console.WriteLine($"Windows mice: {windowsMice.Count}");
+foreach (var mouse in windowsMice)
+{
+    Console.WriteLine($"  {mouse.Name}: {mouse.Connection}, {mouse.ButtonCount} buttons, remappable: {string.Join(", ", mouse.Buttons)}");
+    Console.WriteLine($"    {mouse.DevicePath}");
+}
+if (command == "devices") return 0;
 if (Environment.GetEnvironmentVariable("OPENPOINTER_TRACE") == "1") HidppTransport.Trace = Console.WriteLine;
 var transports = HidppTransport.OpenAll(Console.WriteLine);
 if (transports.Count == 0)
 {
-    Console.WriteLine("No Logitech HID++ endpoints found.");
-    return 1;
+    Console.WriteLine("No Logitech HID++ endpoints found. Standard mice use Windows button remapping in the app.");
+    return command == "dump" && windowsMice.Count > 0 ? 0 : 1;
 }
 
 var mice = new List<MouseDevice>();

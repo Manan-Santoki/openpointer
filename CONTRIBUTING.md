@@ -18,7 +18,7 @@ Thanks for helping! Bug reports, device reports, cursor packs and code are all w
 You need:
 - Windows 10 or 11, x64
 - the [.NET 10 SDK](https://dotnet.microsoft.com/download)
-- a Logitech HID++ 2.0 mouse, to test against real hardware
+- a standard Bluetooth, USB or wireless mouse to test button remapping; a Logitech HID++ 2.0 mouse to test direct hardware controls
 
 ```
 git clone https://github.com/Manan-Santoki/openpointer.git
@@ -33,6 +33,7 @@ Only one instance runs at a time. Quit an installed copy first (tray → Quit, o
 
 ```
 dotnet run --project src/OpenPointer.Cli -- dump      # identity, features, controls, DPI, battery
+dotnet run --project src/OpenPointer.Cli -- devices   # Windows mice and their available buttons, read-only
 dotnet run --project src/OpenPointer.Cli -- listen    # remap controls and print their raw events
 ```
 
@@ -44,6 +45,7 @@ Set `OPENPOINTER_TRACE=1` to log every HID++ report.
 |---|---|
 | `src/OpenPointer.Core/Hidpp` | HID++ transport, feature access, mouse features (buttons, DPI, SmartShift, wheels, battery, Easy-Switch) |
 | `src/OpenPointer.Core/Engine` | Device lifecycle and reconnects, per-app button remapping, action execution |
+| `src/OpenPointer.Core/Platform/WindowsMouse*` | Standard mouse discovery, HID button capabilities and Windows input interception |
 | `src/OpenPointer.Core/Config` | Settings model, profiles, actions, key chords, action catalog |
 | `src/OpenPointer.Core/Platform` | Windows integration: input, focus tracking, cursors, autostart, Options+ detection |
 | `src/OpenPointer.Core/Updates` | GitHub Releases update check and verified download |
@@ -79,6 +81,8 @@ Cursor packs are folders under `src/OpenPointer/Assets/Cursors/`, each with its 
 - The tests check that every file referenced in `pack.json` exists.
 
 ## Supporting a new device or feature
+
+Standard mice use the Windows mouse backend: middle and available side buttons are discovered from HID usages (falling back to the Windows-reported button count). The shared Windows hook cannot identify which physical mouse generated a click, so standard mappings apply across mice. Left/right clicks and injected input are left alone. Hardware controls must only be shown when the device exposes them.
 
 Most HID++ 2.0 mice work without changes, because features are discovered from the device. If yours needs something new:
 

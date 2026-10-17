@@ -22,7 +22,7 @@ public sealed class PointerPage(MainWindow window) : IPage
         var mouse = Services.SelectedMouse;
         if (mouse == null)
         {
-            page.Children.Add(EmptyState.Create("", "No mouse connected", "Turn on your mouse, or plug in its receiver."));
+            page.Children.Add(EmptyState.Create("", "No mouse connected", "Connect a mouse by Bluetooth, USB or its wireless receiver."));
             return page;
         }
 
@@ -31,6 +31,10 @@ public sealed class PointerPage(MainWindow window) : IPage
             page.Children.Add(Ui.Section("Pointer speed"));
             page.Children.Add(DpiCard(mouse, dpi));
         }
+
+        if (mouse.IsStandardMouse)
+            page.Children.Add(Ui.Card([Ui.Row("Windows mouse support",
+                "Button mappings and scroll speed are available. Use the mouse's own controls for DPI and Bluetooth channel switching; battery and wheel hardware settings are not exposed.", null)]));
 
         // Values shown are the drafted ones; nothing reaches the mouse until Save (DPI previews live).
         var settings = Draft.Current.SettingsFor(mouse.Name);
@@ -131,15 +135,15 @@ public sealed class PointerPage(MainWindow window) : IPage
 
         page.Children.Add(Ui.Section("Device"));
         var device = mouse.Device;
-        var connection = device.Device.Transport.IsReceiver
+        var connection = mouse.WindowsDevice?.Connection ?? (device!.Device.Transport.IsReceiver
             ? $"{ReceiverName(device.Device.Transport.ProductId)} · slot {device.Device.DeviceIndex}"
-            : "Direct (Bluetooth or USB)";
+            : "Direct (Bluetooth or USB)");
         page.Children.Add(Ui.Card(
         [
             Ui.Row("Model", null, Value(mouse.Name)),
             Ui.Row("Connection", null, Value(connection)),
-            Ui.Row("Battery", null, Value(mouse.Battery is { } b ? $"{b.Percent}% · {b.Status}" : "Unknown")),
-            Ui.Row("Protocol", null, Value(device.Protocol != null ? $"HID++ {device.Protocol}" : "Unknown")),
+            Ui.Row("Battery", null, Value(mouse.Battery is { } b ? $"{b.Percent}% · {b.Status}" : mouse.IsStandardMouse ? "Not exposed" : "Unknown")),
+            Ui.Row("Protocol", null, Value(mouse.IsStandardMouse ? "Windows mouse input" : device?.Protocol != null ? $"HID++ {device.Protocol}" : "Unknown")),
         ]));
         return page;
     }

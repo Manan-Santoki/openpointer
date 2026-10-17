@@ -3,7 +3,7 @@
 [![Latest release](https://img.shields.io/github/v/release/Manan-Santoki/openpointer)](https://github.com/Manan-Santoki/openpointer/releases/latest)
 [![License: MIT](https://img.shields.io/github/license/Manan-Santoki/openpointer)](LICENSE)
 
-OpenPointer configures Logitech mice on Windows without Logi Options+. It talks to the mouse directly over HID++ 2.0, the protocol Options+ itself uses, so there's no Logitech account, cloud sync or telemetry involved.
+OpenPointer remaps mouse buttons on Windows, including Bluetooth, USB and wireless mice from any brand. Logitech HID++ 2.0 mice also get direct hardware controls without Logi Options+. There's no account, cloud sync or telemetry involved.
 
 I started it because I wanted the side buttons on my mouse to do different things on the desktop than in File Explorer, and to keep changing the volume while I hold a button. Options+ can't do either.
 
@@ -47,9 +47,12 @@ Buttons are only remapped while OpenPointer runs. If you quit it, or it crashes,
 ## Compatibility
 
 - Windows 10 1809 or later, x64.
-- Logitech mice that speak HID++ 2.0, connected through a Bolt, Unifying or Lightspeed receiver or over Bluetooth. That's most Logitech mice from the last decade.
+- Standard Windows mice over Bluetooth, USB or a wireless receiver: middle click and available back/forward buttons, per-app profiles, shortcuts, macros, repeat, gestures and the Actions Ring. Left/right click stay native. Standard button mappings apply across mice on the PC; selecting a device shows its available buttons rather than limiting mappings to that mouse.
+- Logitech mice that speak HID++ 2.0 get additional device-specific controls, connected through a Bolt, Unifying or Lightspeed receiver or over Bluetooth.
 
-So far it has only been tested on a Signature M650 L. If you try another mouse, please [open an issue](https://github.com/Manan-Santoki/openpointer/issues) saying whether it worked.
+A three-button mouse such as the Lenovo 600 Bluetooth Silent Mouse can remap its middle click, including double/triple press and hold gestures. Its hardware DPI and Bluetooth channel buttons stay controlled by the mouse. Standard Windows input does not expose hardware DPI, battery or vendor-specific wheel settings.
+
+The Logitech backend has been tested on a Signature M650 L. The standard Windows backend still needs validation on the Lenovo 600 and other physical mice. If you try another mouse, please [open an issue](https://github.com/Manan-Santoki/openpointer/issues) saying whether it worked. `dotnet run --project src/OpenPointer.Cli -- devices` lists the devices and buttons Windows reports.
 
 Known limitations:
 

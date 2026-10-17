@@ -6,7 +6,7 @@ using OpenPointer.Platform;
 namespace OpenPointer.Engine;
 
 /// <summary>
-/// Owns every HID++ connection: finds mice, keeps them configured across sleep and reconnects,
+/// Owns HID++ connections and the shared Windows mouse input backend: finds mice across brands,
 /// switches diversion when the focused app changes, and turns device events into actions.
 /// </summary>
 public sealed class DeviceManager : IDeviceControl, IDisposable
@@ -17,7 +17,10 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
     private readonly ConfigStore _config;
     private readonly List<HidppTransport> _transports = [];
     private readonly ConcurrentDictionary<(HidppTransport, byte), ConnectedMouse> _mice = new();
+    private readonly ConcurrentDictionary<string, ConnectedMouse> _windowsMice = new(StringComparer.OrdinalIgnoreCase);
     private readonly BlockingCollection<Action> _actionQueue = new();
+    private readonly Thread _actionThread;
+    private WindowsMouseHook? _windowsHook;
 
     /// <summary>Double and triple press tracking per button; used only on the action thread.</summary>
     private readonly Dictionary<(ConnectedMouse, ushort), PressCounter> _counters = [];
@@ -35,7 +38,8 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
         _passive = passive;
         Runner = new ActionRunner(this);
         _config.Changed += config => _ = ReapplyAllAsync(settingsChanged: true);
-        new Thread(ActionLoop) { IsBackground = true, Name = "OpenPointer actions" }.Start();
+        _actionThread = new Thread(ActionLoop) { IsBackground = true, Name = "OpenPointer actions" };
+        _actionThread.Start();
     }
 
     public ActionRunner Runner { get; }
@@ -48,6 +52,11 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
         {
             if (_paused == value) return;
             _paused = value;
+            if (value)
+            {
+                _windowsHook?.Cancel();
+                foreach (var mouse in Mice) QueueAction(() => CancelActions(mouse));
+            }
             _ = ReapplyAllAsync(settingsChanged: false);
             StateChanged?.Invoke();
         }
@@ -58,14 +67,96 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
     /// <summary>The focused context profiles are applied for.</summary>
     public FocusContext Focus => _focus;
 
-    public IReadOnlyList<ConnectedMouse> Mice => _mice.Values.OrderBy(m => m.Name).ToList();
+    public IReadOnlyList<ConnectedMouse> Mice => _mice.Values.Concat(_windowsMice.Values)
+        .OrderBy(m => m.IsStandardMouse).ThenBy(m => m.Name).ToList();
+
+    public bool WindowsRemappingAvailable => _windowsHook != null;
 
     /// <summary>Raised (on a worker thread) when a device appears, disappears or changes state.</summary>
     public event Action? StateChanged;
 
     public event Action<ConnectedMouse>? LowBattery;
 
-    public void Start() => _ = Task.Run(MonitorLoopAsync);
+    public void Start()
+    {
+        if (!_passive)
+        {
+            var hook = new WindowsMouseHook(new WindowsMouseRouter(ResolveWindowsButton, OnWindowsInput));
+            try
+            {
+                hook.Start();
+                _windowsHook = hook;
+                Log.Info("Windows mouse remapping started (shared standard button mappings)");
+            }
+            catch (Exception ex) { hook.Dispose(); Log.Error("Starting Windows mouse remapping", ex); }
+        }
+        _ = Task.Run(MonitorLoopAsync);
+    }
+
+    private WindowsButtonBinding? ResolveWindowsButton(ushort cid)
+    {
+        if (_paused || _stop.IsCancellationRequested) return null;
+        var button = ButtonNames.FromCid(cid);
+        var mouse = _windowsMice.Values.FirstOrDefault(m => m.Online && m.Buttons.Contains(button));
+        if (mouse == null) return null;
+        return WindowsButtonBinding.Resolve(mouse, _config.Current, FocusTracker.Snapshot(), cid);
+    }
+
+    private void OnWindowsInput(WindowsMouseEvent input) => QueueAction(() =>
+    {
+        switch (input)
+        {
+            case WindowsMouseEvent.Down down:
+                if (down.Mouse.Online) OnButtonDown(down.Mouse, down.Cid, down.Binding.Presses);
+                break;
+            case WindowsMouseEvent.Up up: OnButtonUp(up.Mouse, up.Cid); break;
+            case WindowsMouseEvent.Move move: Runner.Move(move.Mouse, move.Dx, move.Dy); break;
+            case WindowsMouseEvent.Cancel cancel: CancelActions(cancel.Mouse); break;
+        }
+    });
+
+    private void QueueAction(Action action)
+    {
+        try { _actionQueue.TryAdd(action); }
+        catch (InvalidOperationException) { } // Shutdown raced an input notification.
+    }
+
+    private void CancelActions(ConnectedMouse mouse)
+    {
+        foreach (var key in _counters.Keys.Where(k => k.Item1 == mouse).ToArray())
+        {
+            _counters[key].Reset();
+            _counters.Remove(key);
+        }
+        Runner.ReleaseAll(mouse, cancel: true);
+    }
+
+    private void ScanWindowsMice()
+    {
+        if (_stop.IsCancellationRequested) return;
+        var found = WindowsMouseDiscovery.Enumerate().Where(info => !IsHandledByHidpp(info)).ToList();
+        var paths = found.Select(m => m.DevicePath).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var changed = false;
+        foreach (var key in _windowsMice.Keys.Where(p => !paths.Contains(p)))
+        {
+            if (!_windowsMice.TryRemove(key, out var removed)) continue;
+            removed.Online = false;
+            _windowsHook?.Cancel(removed);
+            QueueAction(() => CancelActions(removed));
+            changed = true;
+        }
+        foreach (var info in found)
+        {
+            if (_stop.IsCancellationRequested) return;
+            if (!_windowsMice.TryAdd(info.DevicePath, new ConnectedMouse(info))) continue;
+            Log.Info($"Connected {info.Name} via Windows mouse input ({info.Connection}, {info.ButtonCount} buttons)");
+            changed = true;
+        }
+        if (changed) StateChanged?.Invoke();
+    }
+
+    private bool IsHandledByHidpp(WindowsMouseInfo info) => info.VendorId == HidppTransport.VendorLogitech &&
+        _mice.Values.Any(m => m.Device!.Device.Transport.ProductId == info.ProductId);
 
     /// <summary>Called by the UI when the foreground window changes.</summary>
     public void OnFocusChanged(FocusContext context)
@@ -87,9 +178,8 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
         {
             try
             {
-                bool needScan;
-                lock (_transportSync) needScan = _transports.Count == 0;
-                if (needScan) await ScanAsync().ConfigureAwait(false);
+                ScanWindowsMice();
+                await ScanAsync().ConfigureAwait(false);
 
                 if (DateTime.UtcNow - lastBattery > BatteryInterval)
                 {
@@ -109,15 +199,24 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
 
     private async Task ScanAsync()
     {
-        var opened = HidppTransport.OpenAll(Log.Info);
+        HashSet<string> existing;
+        lock (_transportSync) existing = _transports.Select(t => t.DevicePath).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var opened = HidppTransport.OpenAll(Log.Info, existing);
         foreach (var transport in opened)
         {
-            lock (_transportSync) _transports.Add(transport);
+            lock (_transportSync)
+            {
+                if (_stop.IsCancellationRequested) { transport.Dispose(); continue; }
+                _transports.Add(transport);
+            }
             transport.Closed += () => OnTransportClosed(transport);
             transport.Notification += message => OnNotification(transport, message);
             await DeviceDiscovery.EnableReceiverNotificationsAsync(transport).ConfigureAwait(false);
             foreach (var slot in DeviceDiscovery.SlotsOf(transport))
+            {
+                if (_stop.IsCancellationRequested) break;
                 await TryAddAsync(transport, slot).ConfigureAwait(false);
+            }
         }
 
         if (opened.Count > 0) StateChanged?.Invoke();
@@ -128,9 +227,10 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
         try
         {
             var device = await DeviceDiscovery.ProbeSlotAsync(transport, slot, Log.Info).ConfigureAwait(false);
-            if (device == null) return;
+            if (device == null || _stop.IsCancellationRequested) return;
             var mouse = new MouseDevice(device);
             await mouse.InitializeAsync().ConfigureAwait(false);
+            if (_stop.IsCancellationRequested) return;
             if (!mouse.IsMouseLike)
             {
                 Log.Info($"Ignoring {mouse.Name} (not a pointing device)");
@@ -142,6 +242,7 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
             _mice[(transport, slot)] = connected;
             Log.Info($"Connected {mouse.Name} on PID {transport.ProductId:X4} slot {slot}");
             await ConfigureAsync(connected).ConfigureAwait(false);
+            ScanWindowsMice();
             StateChanged?.Invoke();
         }
         catch (Exception ex)
@@ -152,16 +253,17 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
 
     private void Wire(ConnectedMouse mouse)
     {
-        var device = mouse.Device;
-        device.ButtonDown += cid => _actionQueue.Add(() => OnButtonDown(mouse, cid));
-        device.ButtonUp += cid => _actionQueue.Add(() => OnButtonUp(mouse, cid));
+        var device = mouse.Device!;
+        device.ButtonDown += cid => QueueAction(() => OnButtonDown(mouse, cid));
+        device.ButtonUp += cid => QueueAction(() => OnButtonUp(mouse, cid));
         device.RawMove += (dx, dy) => Runner.Move(mouse, dx, dy);
-        device.ThumbWheel += (rotation, phase) => _actionQueue.Add(() => OnThumbWheel(mouse, rotation, phase));
+        device.ThumbWheel += (rotation, phase) => QueueAction(() => OnThumbWheel(mouse, rotation, phase));
     }
 
-    private void OnButtonDown(ConnectedMouse mouse, ushort cid)
+    private void OnButtonDown(ConnectedMouse mouse, ushort cid, ActionSpec?[]? resolved = null)
     {
-        if (_paused)
+        if (_stop.IsCancellationRequested || !mouse.Online) return;
+        if (_paused && resolved == null)
         {
             Runner.Press(mouse, cid, new NativeAction());
             return;
@@ -169,7 +271,7 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
 
         var context = FocusTracker.Snapshot();
         var button = ButtonNames.FromCid(cid);
-        var presses = ContextMatcher.ResolvePresses(_config.Current, context, button);
+        var presses = resolved ?? ContextMatcher.ResolvePresses(_config.Current, context, button);
         var counter = Counter(mouse, cid);
         if (!counter.Busy && presses.Skip(1).All(p => p == null))
         {
@@ -209,7 +311,7 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
         var delay = Math.Clamp(_config.Current.General.MultiPressMs, 150, 800);
         _ = Task.Delay(delay).ContinueWith(_ =>
         {
-            if (!_actionQueue.IsAddingCompleted) _actionQueue.TryAdd(() => Run(mouse, cid, counter.Expire(generation)));
+            QueueAction(() => Run(mouse, cid, counter.Expire(generation)));
         }, TaskScheduler.Default);
     }
 
@@ -274,7 +376,7 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
         }
 
         if (_mice.TryGetValue((transport, message.DeviceIndex), out var mouse))
-            mouse.Device.Device.HandleNotification(message);
+            mouse.Device!.Device.HandleNotification(message);
     }
 
     private async Task OnLinkChangedAsync(HidppTransport transport, byte slot, bool linked)
@@ -294,8 +396,8 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
         {
             if (!mouse.Online) return;
             mouse.Online = false;
-            Runner.ReleaseAll(mouse);
-            mouse.Device.ReleaseAll();
+            QueueAction(() => CancelActions(mouse));
+            mouse.Device!.ReleaseAll();
             Log.Info($"{mouse.Name} went offline");
             StateChanged?.Invoke();
             return;
@@ -305,7 +407,7 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
         await Task.Delay(500).ConfigureAwait(false);
         try
         {
-            await mouse.Device.InitializeAsync().ConfigureAwait(false);
+            await mouse.Device!.InitializeAsync().ConfigureAwait(false);
             mouse.Online = true;
             mouse.AppliedDivert.Clear();
             mouse.AppliedThumb = null;
@@ -325,7 +427,7 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
         Log.Info($"Receiver/device PID {transport.ProductId:X4} was removed");
         foreach (var key in _mice.Keys.Where(k => k.Item1 == transport).ToList())
         {
-            if (_mice.TryRemove(key, out var mouse)) Runner.ReleaseAll(mouse);
+            if (_mice.TryRemove(key, out var mouse)) QueueAction(() => CancelActions(mouse));
         }
 
         lock (_transportSync) _transports.Remove(transport);
@@ -337,7 +439,7 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
     /// <summary>Reads state and pushes config to a freshly connected mouse.</summary>
     private async Task ConfigureAsync(ConnectedMouse mouse)
     {
-        var device = mouse.Device;
+        var device = mouse.Device!;
         mouse.Battery = await Safe(device.GetBatteryAsync).ConfigureAwait(false);
         mouse.Dpi = await Safe(() => device.GetDpiAsync()).ConfigureAwait(false);
         mouse.SmartShift = await Safe(device.GetSmartShiftAsync).ConfigureAwait(false);
@@ -371,7 +473,7 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
     {
         if (_passive) return;
         var settings = _config.Current.SettingsFor(mouse.Name);
-        var device = mouse.Device;
+        var device = mouse.Device!;
 
         if (mouse.SmartShift != null && (settings.SmartShiftEnabled != null || settings.SmartShiftThreshold != null))
         {
@@ -416,7 +518,7 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
         {
             var config = _config.Current;
             var context = _focus;
-            foreach (var control in mouse.Device.Controls.Where(c => c.IsDivertable && c.Cid is not (0x50 or 0x51)))
+            foreach (var control in mouse.Device!.Controls.Where(c => c.IsDivertable && c.Cid is not (0x50 or 0x51)))
             {
                 var presses = _paused ? new ActionSpec?[] { new NativeAction() } : ContextMatcher.ResolvePresses(config, context, ButtonNames.FromCid(control.Cid));
                 var action = presses[0];
@@ -465,7 +567,7 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
 
     private async Task RefreshBatteryAsync(ConnectedMouse mouse)
     {
-        var battery = await Safe(mouse.Device.GetBatteryAsync).ConfigureAwait(false);
+        var battery = await Safe(mouse.Device!.GetBatteryAsync).ConfigureAwait(false);
         if (battery == null || battery == mouse.Battery) return;
         mouse.Battery = battery;
         CheckBattery(mouse);
@@ -490,6 +592,7 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
 
     public async Task<int?> GetDpiAsync(ConnectedMouse mouse)
     {
+        if (mouse.Device == null) return null;
         mouse.Dpi = await Safe(() => mouse.Device.GetDpiAsync()).ConfigureAwait(false) ?? mouse.Dpi;
         return mouse.Dpi?.Current;
     }
@@ -499,6 +602,7 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
     /// <param name="notify">False for live previews, so the UI is not rebuilt mid-drag.</param>
     public async Task SetDpiAsync(ConnectedMouse mouse, int dpi, bool persist, bool notify)
     {
+        if (mouse.Device == null) throw new NotSupportedException("Hardware DPI is not available for this mouse. Use its DPI button or Windows pointer settings.");
         await SetDpiCoreAsync(mouse, dpi).ConfigureAwait(false);
         if (persist)
         {
@@ -516,7 +620,7 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
     private async Task SetDpiCoreAsync(ConnectedMouse mouse, int dpi)
     {
         var snapped = Snap(mouse, dpi);
-        await mouse.Device.SetDpiAsync(snapped).ConfigureAwait(false);
+        await mouse.Device!.SetDpiAsync(snapped).ConfigureAwait(false);
         if (mouse.Dpi != null) mouse.Dpi = mouse.Dpi with { Current = snapped };
     }
 
@@ -550,6 +654,7 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
 
     public async Task ToggleWheelModeAsync(ConnectedMouse mouse)
     {
+        if (mouse.Device == null) throw new NotSupportedException("This mouse does not expose wheel mode control.");
         var state = await Safe(mouse.Device.GetSmartShiftAsync).ConfigureAwait(false);
         if (state == null) return;
         var next = state.Mode == WheelRatchetMode.Ratchet ? WheelRatchetMode.Freespin : WheelRatchetMode.Ratchet;
@@ -558,7 +663,8 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
         StateChanged?.Invoke();
     }
 
-    public Task SwitchHostAsync(ConnectedMouse mouse, int host) => mouse.Device.SwitchHostAsync(host - 1);
+    public Task SwitchHostAsync(ConnectedMouse mouse, int host) => mouse.Device?.SwitchHostAsync(host - 1)
+        ?? Task.FromException(new NotSupportedException("Use the mouse's physical Bluetooth channel switch."));
 
     private static async Task<T?> Safe<T>(Func<Task<T?>> read) where T : class
     {
@@ -581,12 +687,12 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
             foreach (var (cid, state) in mouse.AppliedDivert)
             {
                 if (!state.Divert) continue;
-                try { await mouse.Device.SetDivertAsync(cid, false).ConfigureAwait(false); } catch { }
+                try { await mouse.Device!.SetDivertAsync(cid, false).ConfigureAwait(false); } catch { }
             }
 
             if (mouse.AppliedThumb is { Diverted: true } thumb)
             {
-                try { await mouse.Device.SetThumbWheelAsync(false, thumb.Inverted).ConfigureAwait(false); } catch { }
+                try { await mouse.Device!.SetThumbWheelAsync(false, thumb.Inverted).ConfigureAwait(false); } catch { }
             }
         }).ToArray();
         Task.WaitAll(tasks, TimeSpan.FromSeconds(3));
@@ -595,8 +701,12 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
     public void Dispose()
     {
         _stop.Cancel();
+        _windowsHook?.Dispose();
+        _windowsHook = null;
+        foreach (var mouse in Mice) QueueAction(() => CancelActions(mouse));
         RestoreDevices();
         _actionQueue.CompleteAdding();
+        if (Thread.CurrentThread != _actionThread) _actionThread.Join(TimeSpan.FromSeconds(3));
         lock (_transportSync)
         {
             foreach (var t in _transports) t.Dispose();

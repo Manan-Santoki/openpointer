@@ -52,7 +52,7 @@ public sealed class ApplicationsPage(MainWindow window) : IPage
         else parts.Add(string.Join(", ", profile.Match.Select(m => m switch { ContextMatcher.Desktop => "Desktop", ContextMatcher.Taskbar => "Taskbar", _ => m })));
         var customized = profile.Buttons.Count + (profile.ThumbWheelLeft != null || profile.ThumbWheelRight != null ? 1 : 0);
         if (!isDefault) parts.Add(customized == 0 ? "No changes yet" : customized == 1 ? "1 change" : $"{customized} changes");
-        if (profile.Dpi != null) parts.Add($"{profile.Dpi} DPI");
+        if (profile.Dpi != null && Services.SelectedMouse?.Dpi != null) parts.Add($"{profile.Dpi} DPI");
         var caption = Ui.Text(string.Join("  ·  ", parts), "Caption");
         caption.Margin = new Thickness(0, 2, 0, 0);
         text.Children.Add(caption);
@@ -90,17 +90,20 @@ public sealed class ApplicationsPage(MainWindow window) : IPage
             }));
         }
 
-        menu.Items.Add(Ui.MenuItem("Pointer speed…", () =>
+        if (Services.SelectedMouse?.Dpi != null)
         {
-            var text = Dialogs.AskText(window, "Pointer speed for this profile",
-                "DPI to use while this profile is active. Leave empty to use the device setting.", profile.Dpi?.ToString() ?? "");
-            if (text == null) return;
-            var dpi = int.TryParse(text.Trim(), out var value) && value > 0 ? value : (int?)null;
-            Draft.Edit(c => c.Profiles[index].Dpi = dpi);
-        }, hint: profile.Dpi != null ? $"{profile.Dpi}" : null));
+            menu.Items.Add(Ui.MenuItem("Pointer speed…", () =>
+            {
+                var text = Dialogs.AskText(window, "Pointer speed for this profile",
+                    "DPI to use while this profile is active. Leave empty to use the device setting.", profile.Dpi?.ToString() ?? "");
+                if (text == null) return;
+                var dpi = int.TryParse(text.Trim(), out var value) && value > 0 ? value : (int?)null;
+                Draft.Edit(c => c.Profiles[index].Dpi = dpi);
+            }, hint: profile.Dpi != null ? $"{profile.Dpi}" : null));
 
-        if (profile.Dpi != null)
-            menu.Items.Add(Ui.MenuItem("Use device pointer speed", () => Draft.Edit(c => c.Profiles[index].Dpi = null)));
+            if (profile.Dpi != null)
+                menu.Items.Add(Ui.MenuItem("Use device pointer speed", () => Draft.Edit(c => c.Profiles[index].Dpi = null)));
+        }
 
         if (!isDefault)
         {

@@ -26,12 +26,12 @@ public static class Services
         get
         {
             var mice = Devices.Mice;
-            return mice.FirstOrDefault(m => m.Name == _selectedName) ?? mice.FirstOrDefault(m => m.Online) ?? mice.FirstOrDefault();
+            return mice.FirstOrDefault(m => m.Key == _selectedKey) ?? mice.FirstOrDefault(m => m.Online) ?? mice.FirstOrDefault();
         }
-        set => _selectedName = value?.Name;
+        set => _selectedKey = value?.Key;
     }
 
-    private static string? _selectedName;
+    private static string? _selectedKey;
 
     public static string ExecutablePath => Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "OpenPointer.exe");
 }

@@ -200,7 +200,7 @@ public sealed class ActionRunner
             lock (_sync) _held[(mouse, cid)] = held;
     }
 
-    public void Release(ConnectedMouse mouse, ushort cid)
+    public void Release(ConnectedMouse mouse, ushort cid, bool cancel = false)
     {
         Held? held;
         lock (_sync)
@@ -222,7 +222,7 @@ public sealed class ActionRunner
                 case HeldMouse m:
                     InputSynth.MouseButton(m.Button, down: false);
                     break;
-                case HeldGesture g:
+                case HeldGesture g when !cancel:
                     var picked = PickGesture(g);
                     if (picked != null) Fire(mouse, picked);
                     break;
@@ -231,7 +231,7 @@ public sealed class ActionRunner
                     break;
                 case HeldRing ring:
                     Ring?.Hide();
-                    if (ring.Selected >= 0 && Environment.TickCount64 - ring.Started >= RingClickMs) Fire(mouse, ring.Ring.Items[ring.Selected].Action);
+                    if (!cancel && ring.Selected >= 0 && Environment.TickCount64 - ring.Started >= RingClickMs) Fire(mouse, ring.Ring.Items[ring.Selected].Action);
                     break;
             }
         }
@@ -272,11 +272,11 @@ public sealed class ActionRunner
     }
 
     /// <summary>Releases everything held for a device (it disconnected or went to sleep).</summary>
-    public void ReleaseAll(ConnectedMouse mouse)
+    public void ReleaseAll(ConnectedMouse mouse, bool cancel = false)
     {
         List<ushort> cids;
         lock (_sync) cids = _held.Keys.Where(k => k.Item1 == mouse).Select(k => k.Item2).ToList();
-        foreach (var cid in cids) Release(mouse, cid);
+        foreach (var cid in cids) Release(mouse, cid, cancel);
     }
 
     internal static ActionSpec? PickGesture(GestureAction g, int dx, int dy)
