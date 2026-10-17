@@ -1,9 +1,11 @@
 name: Release
 
-# Push a tag like v0.3.0 to build, test and publish a release:
+# Merging to main with a new <Version> in src/OpenPointer/OpenPointer.csproj publishes that
+# version. Pushing a tag like v0.3.0 also works:
 #   git tag v0.3.0 && git push origin v0.3.0
 on:
   push:
+    branches: [main]
     tags: ["v*.*.*"]
 
 permissions:
@@ -13,7 +15,37 @@ env:
   INNO_VERSION: 6.7.3
 
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      value: ${{ steps.version.outputs.value }}
+      publish: ${{ steps.version.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version to release
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' src/OpenPointer/OpenPointer.csproj)
+          fi
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then echo "Version must look like 1.2.3, got '$version'"; exit 1; fi
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+          # On main, publish only a version that has no release yet.
+          if [ "$GITHUB_REF_TYPE" != tag ] && gh release view "v$version" > /dev/null 2>&1; then
+            echo "v$version is already released"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
   release:
+    needs: version
+    if: needs.version.outputs.publish == 'true'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,13 +54,10 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Version from tag
+      - name: Version
         id: version
         shell: pwsh
-        run: |
-          $version = "${{ github.ref_name }}".TrimStart('v')
-          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Tag must look like v1.2.3, got ${{ github.ref_name }}" }
-          "value=$version" >> $env:GITHUB_OUTPUT
+        run: '"value=${{ needs.version.outputs.value }}" >> $env:GITHUB_OUTPUT'
 
       - name: Release notes from CHANGELOG.md
         shell: pwsh
@@ -72,7 +101,7 @@ jobs:
         shell: pwsh
         run: |
           $v = "${{ steps.version.outputs.value }}"
-          gh release create "${{ github.ref_name }}" `
+          gh release create "v$v" --target "${{ github.sha }}" `
             "artifacts/OpenPointer-Setup-$v.exe" `
             "artifacts/OpenPointer-$v-portable.zip" `
             "artifacts/SHA256SUMS.txt" `

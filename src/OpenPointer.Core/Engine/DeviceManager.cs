@@ -24,6 +24,7 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
     private readonly BlockingCollection<Action> _actionQueue = new();
     private readonly Thread _actionThread;
     private WindowsMouseHook? _windowsHook;
+    private readonly SeenButtonStore _seenButtons = new();
 
     /// <summary>Double and triple press tracking per button; used only on the action thread.</summary>
     private readonly Dictionary<(ConnectedMouse, ushort), PressCounter> _counters = [];
@@ -85,12 +86,13 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
     {
         if (!_passive)
         {
-            var hook = new WindowsMouseHook(new WindowsMouseRouter(ResolveWindowsButton, OnWindowsInput));
+            var hook = new WindowsMouseHook(new WindowsMouseRouter(ResolveWindowsButton, OnWindowsInput),
+                (path, button) => QueueAction(() => OnWindowsButtonSeen(path, button)));
             try
             {
                 hook.Start();
                 _windowsHook = hook;
-                Log.Info("Windows mouse remapping started (shared standard button mappings)");
+                Log.Info($"Windows mouse remapping started (shared standard button mappings; per-mouse button detection {(hook.ObservesDevices ? "on" : "off")})");
             }
             catch (Exception ex) { hook.Dispose(); Log.Error("Starting Windows mouse remapping", ex); }
         }
@@ -104,6 +106,15 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
         var mouse = _windowsMice.Values.FirstOrDefault(m => m.Online && m.WindowsDevice!.IsVisible(_config.Current.General) && m.Buttons.Contains(button));
         if (mouse == null) return null;
         return WindowsButtonBinding.Resolve(mouse, _config.Current, FocusTracker.Snapshot(), cid);
+    }
+
+    private void OnWindowsButtonSeen(string path, string button)
+    {
+        if (!_windowsMice.TryGetValue(path, out var mouse) || mouse.SeenButtons is not { } seen || seen.Contains(button)) return;
+        mouse.SeenButtons = new HashSet<string>(seen) { button };
+        _seenButtons.Add(mouse.WindowsDevice!, button);
+        Log.Info($"{mouse.Name}: {ButtonNames.Label(button)} pressed for the first time");
+        StateChanged?.Invoke();
     }
 
     private void OnWindowsInput(WindowsMouseEvent input) => QueueAction(() =>
@@ -165,8 +176,12 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
                 }
                 continue;
             }
-            if (!_windowsMice.TryAdd(info.DevicePath, new ConnectedMouse(info))) continue;
-            Log.Info($"Connected {info.Name} via Windows mouse input ({info.Connection}, {info.ButtonCount} buttons)");
+            // Without raw input, presses can't be attributed to a mouse, so every reported button is shown.
+            var mouse = new ConnectedMouse(info) { SeenButtons = _windowsHook?.ObservesDevices == true ? _seenButtons.For(info) : null };
+            if (!_windowsMice.TryAdd(info.DevicePath, mouse)) continue;
+            var reported = info.Buttons.Count == 0 ? "none" : string.Join(", ", info.Buttons);
+            var waiting = mouse.UnconfirmedButtons.Count == 0 ? "" : $"; {string.Join(", ", mouse.UnconfirmedButtons)} shown after the first press";
+            Log.Info($"Connected {info.Name} via Windows mouse input ({info.Connection}, extra buttons reported: {reported}{waiting})");
             changed = true;
         }
         if (changed) StateChanged?.Invoke();

@@ -322,3 +322,57 @@ public class WindowsMouseActionTests
         public void Aim(double x, double y) { }
     }
 }
+
+public class SeenButtonTests
+{
+    [Fact]
+    public void ReportedSideButtonsWaitForARealPress()
+    {
+        // The Lenovo 600 declares five HID buttons but only has a wheel button.
+        var mouse = new ConnectedMouse(new WindowsMouseInfo("lenovo", "Lenovo 600 Bluetooth Silent Mouse", 5, "Bluetooth", ButtonMask: 31))
+        {
+            SeenButtons = new HashSet<string>(),
+        };
+        Assert.Equal([ButtonNames.Middle], mouse.Buttons);
+        Assert.Equal([ButtonNames.Forward, ButtonNames.Back], mouse.UnconfirmedButtons);
+        Assert.Null(WindowsButtonBinding.Resolve(mouse, BackMapped(), FocusContext.Unknown, ButtonNames.ToCid(ButtonNames.Back)!.Value));
+
+        mouse.SeenButtons = new HashSet<string> { ButtonNames.Back };
+        Assert.Equal([ButtonNames.Middle, ButtonNames.Back], mouse.Buttons);
+        Assert.Equal([ButtonNames.Forward], mouse.UnconfirmedButtons);
+        Assert.NotNull(WindowsButtonBinding.Resolve(mouse, BackMapped(), FocusContext.Unknown, ButtonNames.ToCid(ButtonNames.Back)!.Value));
+    }
+
+    [Fact]
+    public void WithoutPerMouseDetectionEveryReportedButtonIsShown()
+    {
+        var mouse = new ConnectedMouse(new WindowsMouseInfo("mouse", "Mouse", 5, "USB", ButtonMask: 31));
+        Assert.Equal([ButtonNames.Middle, ButtonNames.Forward, ButtonNames.Back], mouse.Buttons);
+        Assert.Empty(mouse.UnconfirmedButtons);
+    }
+
+    [Fact]
+    public void SeenButtonsPersistPerModel()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"openpointer-seen-{Guid.NewGuid():N}.json");
+        try
+        {
+            var first = new WindowsMouseInfo(@"\\?\HID#path-a", "Mouse", 5, "Bluetooth", 0x17EF, 0x6099);
+            var store = new SeenButtonStore(path);
+            Assert.Empty(store.For(first));
+            Assert.True(store.Add(first, ButtonNames.Back));
+            Assert.False(store.Add(first, ButtonNames.Back));
+            var reopened = new SeenButtonStore(path);
+            Assert.Equal([ButtonNames.Back], reopened.For(first with { DevicePath = @"\\?\HID#path-b" }));
+            Assert.Empty(reopened.For(first with { ProductId = 0x6100 }));
+        }
+        finally { File.Delete(path); }
+    }
+
+    private static AppConfig BackMapped()
+    {
+        var config = AppConfig.CreateDefault();
+        config.DefaultProfile.Buttons[ButtonNames.Back] = new KeysAction("ctrl+c");
+        return config;
+    }
+}

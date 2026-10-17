@@ -6,6 +6,14 @@ Each release's notes on GitHub are taken from its section here, so add an entry 
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-10-17
+
+### Fixed
+- Back and Forward no longer appear for mice that don't have them. Many mice tell Windows they have five buttons when they have three, so standard mice now show side buttons after you press them once, and OpenPointer remembers them for that model.
+- Button remapping for standard mice recovers by itself if Windows stops delivering mouse input to OpenPointer.
+- Built-in pointing devices are no longer labelled "PCI Device".
+- The log lists the extra buttons each mouse reports and records the first press of each button, which makes mouse problems easier to diagnose.
+
 ## [0.8.1] - 2026-10-17
 
 ### Added
@@ -165,6 +173,10 @@ First build (not published as a release).
 - Detects Logi Options+ and offers to stop it.
 
 [Unreleased]: https://github.com/Manan-Santoki/openpointer/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/Manan-Santoki/openpointer/compare/v0.7.0...v0.8.1
+[0.7.0]: https://github.com/Manan-Santoki/openpointer/compare/v0.6.0...v0.7.0
+[Unreleased]: https://github.com/Manan-Santoki/openpointer/compare/v0.8.2...HEAD
+[0.8.2]: https://github.com/Manan-Santoki/openpointer/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/Manan-Santoki/openpointer/compare/v0.7.0...v0.8.1
 [0.7.0]: https://github.com/Manan-Santoki/openpointer/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/Manan-Santoki/openpointer/compare/v0.5.1...v0.6.0
