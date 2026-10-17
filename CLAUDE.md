@@ -42,7 +42,7 @@ Then delete `settings.png` (it shows the local username in the config path) and 
 
 1. Bump `<Version>` in `src/OpenPointer/OpenPointer.csproj`.
 2. Add a `## [x.y.z] - YYYY-MM-DD` section to `CHANGELOG.md` (Keep a Changelog: Added / Changed / Fixed, written for users) and update the compare links at the bottom.
-3. Commit, then `git tag vX.Y.Z && git push && git push origin vX.Y.Z`.
+3. Commit and merge to `main`. A push to `main` whose `<Version>` has no release yet publishes it; pushing a tag `vX.Y.Z` still works too.
 4. `.github/workflows/release.yml` then:
    - takes the notes from the changelog via `.github/scripts/release-notes.ps1`, and **fails if the entry is missing**
    - runs the tests and publishes a single-file self-contained build
