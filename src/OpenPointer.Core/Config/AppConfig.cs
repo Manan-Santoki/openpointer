@@ -66,6 +66,11 @@ public sealed class GeneralSettings
     /// <summary>Look for new releases on GitHub in the background.</summary>
     public bool CheckForUpdates { get; set; } = true;
 
+    public bool DeveloperMode { get; set; }
+
+    /// <summary>Include touchpad mouse interfaces in the device list, only in developer mode.</summary>
+    public bool ShowTouchpads { get; set; }
+
     /// <summary>"unchanged" (leave Windows alone), "windows" or "macos".</summary>
     public string CursorTheme { get; set; } = "unchanged";
 

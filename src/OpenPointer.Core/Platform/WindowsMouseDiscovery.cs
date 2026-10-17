@@ -2,13 +2,16 @@ using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
+using HidSharp;
 
 namespace OpenPointer.Platform;
 
 /// <summary>A standard mouse exposed by Windows, regardless of brand or connection.</summary>
 public sealed record WindowsMouseInfo(string DevicePath, string Name, int ButtonCount, string Connection,
-    int? VendorId = null, int? ProductId = null, int ButtonMask = -1, Guid? ContainerId = null)
+    int? VendorId = null, int? ProductId = null, int ButtonMask = -1, Guid? ContainerId = null, bool IsTouchpad = false)
 {
+    internal bool IsVisible(Config.GeneralSettings settings) => !IsTouchpad || settings.DeveloperMode && settings.ShowTouchpads;
+
     internal bool MatchesLogitechDevice(int productId, Guid? containerId) => VendorId == Hidpp.HidppTransport.VendorLogitech &&
         ProductId == productId && (ContainerId == null || containerId == null || ContainerId == containerId);
 
@@ -60,7 +63,26 @@ public static class WindowsMouseDiscovery
                 result.Add(Describe(path.ToString(), (int)info.Buttons) with { ButtonMask = ReadButtonMask(device.Handle) });
             }
 
-            return result.DistinctBy(m => m.DevicePath, StringComparer.OrdinalIgnoreCase).ToList();
+            var mouseInterfaces = result.Select(m => Hidpp.HidppTransport.InterfaceKey(m.DevicePath)).ToHashSet();
+            var touchpads = new HashSet<string>();
+            foreach (var device in DeviceList.Local.GetHidDevices())
+            {
+                var key = Hidpp.HidppTransport.InterfaceKey(device.DevicePath);
+                if (!mouseInterfaces.Contains(key)) continue;
+                try
+                {
+                    // A precision touchpad also exposes a legacy mouse collection. Match its
+                    // sibling Touch Pad TLC (Digitizers page 0x0D, usage 0x05), not its name or
+                    // button count: a genuine two-button USB/Bluetooth mouse must remain visible.
+                    if (device.GetReportDescriptor().DeviceItems.Any(i => i.Usages.GetAllValues().Contains(0x000D0005u)))
+                        touchpads.Add(key);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or System.ComponentModel.Win32Exception) { }
+            }
+            return result.DistinctBy(m => m.DevicePath, StringComparer.OrdinalIgnoreCase).Select(m =>
+                touchpads.Contains(Hidpp.HidppTransport.InterfaceKey(m.DevicePath))
+                    ? m with { IsTouchpad = true, Name = m.Name == "Built-in pointing device" ? "Built-in touchpad" : m.Name }
+                    : m).ToList();
         }
 
         throw new Win32Exception(122, "Mouse devices kept changing during enumeration.");

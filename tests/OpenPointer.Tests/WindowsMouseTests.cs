@@ -72,6 +72,33 @@ public class WindowsMouseCapabilityTests
         Assert.False((mouse with { VendorId = 0x17EF }).MatchesLogitechDevice(0xC548, first));
     }
 
+    [Fact]
+    public void TouchpadsRequireBothDeveloperModeAndExplicitOptIn()
+    {
+        var touchpad = new WindowsMouseInfo("touchpad", "Touchpad", 2, "Built-in", IsTouchpad: true);
+        var settings = new GeneralSettings();
+        Assert.False(touchpad.IsVisible(settings));
+        settings.ShowTouchpads = true;
+        Assert.False(touchpad.IsVisible(settings));
+        settings.DeveloperMode = true;
+        Assert.True(touchpad.IsVisible(settings));
+        settings.ShowTouchpads = false;
+        Assert.False(touchpad.IsVisible(settings));
+        Assert.True((touchpad with { IsTouchpad = false, Connection = "Bluetooth" }).IsVisible(settings));
+    }
+
+    [Fact]
+    public void DeveloperDeviceSettingsPersistWithoutEnablingThemForExistingConfigs()
+    {
+        var old = ConfigStore.Parse("{}");
+        Assert.False(old.General.DeveloperMode);
+        Assert.False(old.General.ShowTouchpads);
+        old.General.DeveloperMode = old.General.ShowTouchpads = true;
+        var roundTrip = ConfigStore.Parse(ConfigStore.Serialize(old));
+        Assert.True(roundTrip.General.DeveloperMode);
+        Assert.True(roundTrip.General.ShowTouchpads);
+    }
+
     internal static ConnectedMouse StandardMouse() => new(new WindowsMouseInfo("lenovo", "Lenovo 600 Bluetooth Silent Mouse", 3, "Bluetooth"));
 }
 

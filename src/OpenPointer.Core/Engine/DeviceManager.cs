@@ -20,6 +20,7 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
     private readonly ConcurrentDictionary<string, ConnectedMouse> _windowsMice = new(StringComparer.OrdinalIgnoreCase);
     private sealed record TransportIdentity(Guid? ContainerId, IReadOnlyDictionary<byte, string> PairedMice);
     private readonly ConcurrentDictionary<HidppTransport, TransportIdentity> _identities = new();
+    private readonly ConcurrentDictionary<(HidppTransport, byte), SemaphoreSlim> _probeLocks = new();
     private readonly BlockingCollection<Action> _actionQueue = new();
     private readonly Thread _actionThread;
     private WindowsMouseHook? _windowsHook;
@@ -70,6 +71,7 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
     public FocusContext Focus => _focus;
 
     public IReadOnlyList<ConnectedMouse> Mice => _mice.Values.Concat(_windowsMice.Values)
+        .Where(m => m.WindowsDevice?.IsVisible(_config.Current.General) != false)
         .OrderBy(m => m.IsStandardMouse).ThenBy(m => m.Name).ToList();
 
     public bool WindowsRemappingAvailable => _windowsHook != null;
@@ -99,7 +101,7 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
     {
         if (_paused || _stop.IsCancellationRequested) return null;
         var button = ButtonNames.FromCid(cid);
-        var mouse = _windowsMice.Values.FirstOrDefault(m => m.Online && m.Buttons.Contains(button));
+        var mouse = _windowsMice.Values.FirstOrDefault(m => m.Online && m.WindowsDevice!.IsVisible(_config.Current.General) && m.Buttons.Contains(button));
         if (mouse == null) return null;
         return WindowsButtonBinding.Resolve(mouse, _config.Current, FocusTracker.Snapshot(), cid);
     }
@@ -269,6 +271,18 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
     }
 
     private async Task TryAddAsync(HidppTransport transport, byte slot)
+    {
+        var gate = _probeLocks.GetOrAdd((transport, slot), _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            if (!_stop.IsCancellationRequested && !_mice.ContainsKey((transport, slot)))
+                await ProbeMouseAsync(transport, slot).ConfigureAwait(false);
+        }
+        finally { gate.Release(); }
+    }
+
+    private async Task ProbeMouseAsync(HidppTransport transport, byte slot)
     {
         try
         {

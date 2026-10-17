@@ -52,6 +52,8 @@ Buttons are only remapped while OpenPointer runs. If you quit it, or it crashes,
 
 A three-button mouse such as the Lenovo 600 Bluetooth Silent Mouse can remap its middle click, including double/triple press and hold gestures. Its hardware DPI and Bluetooth channel buttons stay controlled by the mouse. Standard Windows input does not expose hardware DPI, battery or vendor-specific wheel settings.
 
+Touchpads are hidden by default. To include them in the Devices list, enable **Developer mode** in Settings, turn on **Show touchpads**, then Save.
+
 The Logitech backend has been tested on a Signature M650 L. The standard Windows backend still needs validation on the Lenovo 600 and other physical mice. If you try another mouse, please [open an issue](https://github.com/Manan-Santoki/openpointer/issues) saying whether it worked. `dotnet run --project src/OpenPointer.Cli -- devices` lists the devices and buttons Windows reports.
 
 Known limitations:

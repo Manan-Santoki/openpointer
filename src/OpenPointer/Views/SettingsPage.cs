@@ -53,6 +53,17 @@ public sealed class SettingsPage(MainWindow window) : IPage
                 Ui.Switch(Services.Devices.Paused, on => Services.Devices.Paused = on)),
         ]));
 
+        page.Children.Add(Ui.Section("Developer mode"));
+        var developerRows = new List<UIElement>
+        {
+            Ui.Row("Enable developer mode", "Show additional device options",
+                Ui.Switch(config.General.DeveloperMode, on => Draft.Edit(c => c.General.DeveloperMode = on))),
+        };
+        if (config.General.DeveloperMode)
+            developerRows.Add(Ui.Row("Show touchpads", "Include touchpads in the Devices list",
+                Ui.Switch(config.General.ShowTouchpads, on => Draft.Edit(c => c.General.ShowTouchpads = on, rerender: false))));
+        page.Children.Add(Ui.Card(developerRows));
+
         page.Children.Add(Ui.Section("Logi Options+"));
         var running = OptionsPlus.IsRunning();
         UIElement status = running

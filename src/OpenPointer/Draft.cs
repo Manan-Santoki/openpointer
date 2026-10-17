@@ -119,7 +119,8 @@ public static class Draft
         if (draft.General.CursorTheme != saved.General.CursorTheme || draft.General.CursorShadow != saved.General.CursorShadow ||
             draft.General.CursorSize != saved.General.CursorSize) areas.Add("Cursor");
         if (draft.General.Theme != saved.General.Theme || draft.General.StartWithWindows != saved.General.StartWithWindows ||
-            draft.General.WarnAboutOptionsPlus != saved.General.WarnAboutOptionsPlus || draft.General.CheckForUpdates != saved.General.CheckForUpdates)
+            draft.General.WarnAboutOptionsPlus != saved.General.WarnAboutOptionsPlus || draft.General.CheckForUpdates != saved.General.CheckForUpdates ||
+            draft.General.DeveloperMode != saved.General.DeveloperMode || draft.General.ShowTouchpads != saved.General.ShowTouchpads)
             areas.Add("Settings");
         return areas;
     }

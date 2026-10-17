@@ -11,7 +11,7 @@
     <AssemblyName>OpenPointer</AssemblyName>
     <ApplicationIcon>Assets\openpointer.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>0.8.0</Version>
+    <Version>0.8.1</Version>
     <!-- WPF owns DPI awareness through app.manifest. -->
     <NoWarn>$(NoWarn);WFO0003</NoWarn>
   </PropertyGroup>
