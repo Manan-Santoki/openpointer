@@ -60,7 +60,42 @@ public class WindowsMouseCapabilityTests
         Assert.False(mouse.SupportsAction(new MacroAction([new(new WheelModeAction())])));
     }
 
+    [Fact]
+    public void IdenticalReceiverModelsAreMatchedByTheirPhysicalContainer()
+    {
+        var first = Guid.NewGuid();
+        var second = Guid.NewGuid();
+        var mouse = new WindowsMouseInfo("receiver", "Mouse", 5, "USB", 0x046D, 0xC548, ContainerId: first);
+        Assert.True(mouse.MatchesLogitechDevice(0xC548, first));
+        Assert.False(mouse.MatchesLogitechDevice(0xC548, second));
+        Assert.False(mouse.MatchesLogitechDevice(0xC52B, first));
+        Assert.False((mouse with { VendorId = 0x17EF }).MatchesLogitechDevice(0xC548, first));
+    }
+
     internal static ConnectedMouse StandardMouse() => new(new WindowsMouseInfo("lenovo", "Lenovo 600 Bluetooth Silent Mouse", 3, "Bluetooth"));
+}
+
+public class ReceiverIdentityTests
+{
+    [Fact]
+    public void ReadsTheMouseModelFromBoltPairingInformation()
+    {
+        // Captured from the receiver while the paired mouse did not answer a HID++ ping.
+        byte[] info = [0x52, 0x42, 0x2A, 0xB0, 0x5A, 0xBD, 0xEE, 0x58, 1, 0, 0x80, 0x14, 1, 0, 0, 0];
+        byte[] name = [0x62, 1, 11, .. System.Text.Encoding.UTF8.GetBytes("Logi M650 L"), 0, 0];
+        Assert.Equal("Logi M650 L", OpenPointer.Hidpp.DeviceDiscovery.ParseReceiverMouseName(2, info, name));
+        Assert.Null(OpenPointer.Hidpp.DeviceDiscovery.ParseReceiverMouseName(1, info, name));
+        info[1] = 0x41; // Keyboard paired to the same receiver must not become a mouse.
+        Assert.Null(OpenPointer.Hidpp.DeviceDiscovery.ParseReceiverMouseName(2, info, name));
+    }
+
+    [Fact]
+    public void BadOrEmptyNamesAreNotDisplayed()
+    {
+        Assert.Null(OpenPointer.Hidpp.DeviceDiscovery.ParseReceiverMouseName(2, [0x52, 0x42], []));
+        Assert.Null(OpenPointer.Hidpp.DeviceDiscovery.ParseReceiverMouseName(2, [0x52, 0x42], [0x62, 1, 0]));
+        Assert.Null(OpenPointer.Hidpp.DeviceDiscovery.ParseReceiverMouseName(2, [0x52, 0x42], [0x62, 2, 4, 65, 66]));
+    }
 }
 
 public class WindowsMouseBindingTests

@@ -14,6 +14,8 @@ Each release's notes on GitHub are taken from its section here, so add an entry 
 - `openpointer-cli devices` lists Windows mice, connection types and reported buttons without opening HID++ connections.
 
 ### Fixed
+- Logitech Bolt receiver fallback reads the paired mouse name instead of showing "USB Receiver". Physical device identities keep different receivers apart, and built-in pointing devices have a clear label.
+- Receivers retry mice that did not answer the first HID++ probe, so a missed startup response does not leave the mouse in generic mode.
 - Device discovery keeps checking for newly connected mice even when a Logitech receiver is already open.
 - Pausing, disconnecting or quitting cancels pending presses and releases held actions without firing a gesture or ring action.
 

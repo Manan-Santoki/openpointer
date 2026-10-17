@@ -26,7 +26,8 @@ public static class Services
         get
         {
             var mice = Devices.Mice;
-            return mice.FirstOrDefault(m => m.Key == _selectedKey) ?? mice.FirstOrDefault(m => m.Online) ?? mice.FirstOrDefault();
+            return mice.FirstOrDefault(m => m.Key == _selectedKey) ?? mice.FirstOrDefault(m => m.Online && m.Buttons.Count > 0)
+                ?? mice.FirstOrDefault(m => m.Online) ?? mice.FirstOrDefault();
         }
         set => _selectedKey = value?.Key;
     }

@@ -18,8 +18,10 @@ public sealed class PointerPage(MainWindow window) : IPage
     public FrameworkElement Render()
     {
         var page = new StackPanel();
-        page.Children.Add(PageHeader.Create("Pointer & scrolling", "Speed and wheel behavior. Pointer speed changes as you move the slider; save to keep it."));
         var mouse = Services.SelectedMouse;
+        page.Children.Add(PageHeader.Create("Pointer & scrolling", mouse?.IsStandardMouse == true
+            ? "Windows scroll settings apply to every mouse on this PC. Save to apply your changes."
+            : "Speed and wheel behavior. Pointer speed changes as you move the slider; save to keep it."));
         if (mouse == null)
         {
             page.Children.Add(EmptyState.Create("", "No mouse connected", "Connect a mouse by Bluetooth, USB or its wireless receiver."));

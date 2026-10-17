@@ -18,7 +18,7 @@ public sealed class ConnectedMouse
     public ConnectedMouse(WindowsMouseInfo mouse) => WindowsDevice = mouse;
 
     public MouseDevice? Device { get; }
-    public WindowsMouseInfo? WindowsDevice { get; }
+    public WindowsMouseInfo? WindowsDevice { get; internal set; }
     public bool IsStandardMouse => WindowsDevice != null;
     public string Key => Device?.Key ?? WindowsDevice!.DevicePath;
     public string Name => Device?.Name ?? WindowsDevice!.Name;

@@ -3,6 +3,37 @@ namespace OpenPointer.Hidpp;
 /// <summary>Finds HID++ 2.0 devices on every Logitech endpoint and routes notifications to them.</summary>
 public static class DeviceDiscovery
 {
+    /// <summary>Reads paired mouse identities from a Bolt receiver even when HID++ pings fail.
+    /// These are read-only pairing-information queries; they never pair or unpair a device.</summary>
+    public static async Task<IReadOnlyDictionary<byte, string>> ReadReceiverMouseNamesAsync(HidppTransport transport)
+    {
+        var names = new Dictionary<byte, string>();
+        if (transport.ProductId != 0xC548) return names;
+        for (byte slot = 1; slot <= 6; slot++)
+        {
+            try
+            {
+                var info = await transport.RequestAsync(HidppMessage.Short(0xFF, 0x83, 0xB5, [(byte)(0x50 | slot)]),
+                    TimeSpan.FromMilliseconds(500)).ConfigureAwait(false);
+                if (info.Params.Length < 2 || (info.Params[1] & 0x0F) != 2) continue;
+                var name = await transport.RequestAsync(HidppMessage.Short(0xFF, 0x83, 0xB5, [(byte)(0x60 | slot), 1]),
+                    TimeSpan.FromMilliseconds(500)).ConfigureAwait(false);
+                if (ParseReceiverMouseName(slot, info.Params, name.Params) is { } model) names[slot] = model;
+            }
+            catch (Exception ex) when (ex is HidppException or TimeoutException) { }
+        }
+        return names;
+    }
+
+    internal static string? ParseReceiverMouseName(byte slot, ReadOnlySpan<byte> info, ReadOnlySpan<byte> name)
+    {
+        if (info.Length < 2 || info[0] != (0x50 | slot) || (info[1] & 0x0F) != 2 ||
+            name.Length < 3 || name[0] != (0x60 | slot) || name[1] != 1 || name[2] == 0) return null;
+        var length = Math.Min(name[2], name.Length - 3);
+        var text = System.Text.Encoding.UTF8.GetString(name.Slice(3, length)).TrimEnd('\0').Trim();
+        return string.IsNullOrWhiteSpace(text) ? null : text;
+    }
+
     /// <summary>
     /// Probes receiver slots 1-6 (or index 0xFF for direct connections) on a transport and returns
     /// the HID++ 2.0 devices that answer. Notifications on the transport are wired to the devices.

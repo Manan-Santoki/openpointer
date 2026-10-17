@@ -18,6 +18,8 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
     private readonly List<HidppTransport> _transports = [];
     private readonly ConcurrentDictionary<(HidppTransport, byte), ConnectedMouse> _mice = new();
     private readonly ConcurrentDictionary<string, ConnectedMouse> _windowsMice = new(StringComparer.OrdinalIgnoreCase);
+    private sealed record TransportIdentity(Guid? ContainerId, IReadOnlyDictionary<byte, string> PairedMice);
+    private readonly ConcurrentDictionary<HidppTransport, TransportIdentity> _identities = new();
     private readonly BlockingCollection<Action> _actionQueue = new();
     private readonly Thread _actionThread;
     private WindowsMouseHook? _windowsHook;
@@ -134,7 +136,10 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
     private void ScanWindowsMice()
     {
         if (_stop.IsCancellationRequested) return;
-        var found = WindowsMouseDiscovery.Enumerate().Where(info => !IsHandledByHidpp(info)).ToList();
+        IReadOnlyList<WindowsMouseInfo> snapshot;
+        try { snapshot = WindowsMouseDiscovery.Enumerate(); }
+        catch (System.ComponentModel.Win32Exception ex) { Log.Error("Windows mouse discovery", ex); return; }
+        var found = snapshot.Where(info => !IsHandledByHidpp(info)).Select(WithReceiverName).ToList();
         var paths = found.Select(m => m.DevicePath).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var changed = false;
         foreach (var key in _windowsMice.Keys.Where(p => !paths.Contains(p)))
@@ -148,6 +153,16 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
         foreach (var info in found)
         {
             if (_stop.IsCancellationRequested) return;
+            if (_windowsMice.TryGetValue(info.DevicePath, out var existing))
+            {
+                if (existing.WindowsDevice != info)
+                {
+                    existing.WindowsDevice = info;
+                    Log.Info($"Identified Windows mouse as {info.Name} ({info.Connection})");
+                    changed = true;
+                }
+                continue;
+            }
             if (!_windowsMice.TryAdd(info.DevicePath, new ConnectedMouse(info))) continue;
             Log.Info($"Connected {info.Name} via Windows mouse input ({info.Connection}, {info.ButtonCount} buttons)");
             changed = true;
@@ -155,8 +170,23 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
         if (changed) StateChanged?.Invoke();
     }
 
-    private bool IsHandledByHidpp(WindowsMouseInfo info) => info.VendorId == HidppTransport.VendorLogitech &&
-        _mice.Values.Any(m => m.Device!.Device.Transport.ProductId == info.ProductId);
+    private bool MatchesTransport(WindowsMouseInfo info, HidppTransport transport) =>
+        info.MatchesLogitechDevice(transport.ProductId, _identities.GetValueOrDefault(transport)?.ContainerId);
+
+    private bool IsHandledByHidpp(WindowsMouseInfo info) =>
+        _mice.Values.Any(m => MatchesTransport(info, m.Device!.Device.Transport));
+
+    private WindowsMouseInfo WithReceiverName(WindowsMouseInfo info)
+    {
+        var receiver = _identities.FirstOrDefault(p => p.Key.IsReceiver && MatchesTransport(info, p.Key));
+        if (receiver.Value == null) return info;
+        var names = receiver.Value.PairedMice.Values.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        return names.Length == 0 ? info : info with
+        {
+            Name = string.Join(", ", names),
+            Connection = receiver.Key.ProductId == 0xC548 ? "Logi Bolt receiver" : info.Connection,
+        };
+    }
 
     /// <summary>Called by the UI when the foreground window changes.</summary>
     public void OnFocusChanged(FocusContext context)
@@ -212,14 +242,30 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
             transport.Closed += () => OnTransportClosed(transport);
             transport.Notification += message => OnNotification(transport, message);
             await DeviceDiscovery.EnableReceiverNotificationsAsync(transport).ConfigureAwait(false);
-            foreach (var slot in DeviceDiscovery.SlotsOf(transport))
+            _identities[transport] = new(WindowsMouseDiscovery.ReadContainerId(transport.DevicePath),
+                await DeviceDiscovery.ReadReceiverMouseNamesAsync(transport).ConfigureAwait(false));
+        }
+
+        // An opened receiver is not evidence that its mouse answered the first probe. Retry
+        // missing/offline slots so startup races and missed notifications do not strand it.
+        HidppTransport[] active;
+        lock (_transportSync) active = _transports.ToArray();
+        foreach (var transport in active)
+        {
+            var paired = _identities.GetValueOrDefault(transport)?.PairedMice;
+            var slots = paired is { Count: > 0 } ? paired.Keys : DeviceDiscovery.SlotsOf(transport);
+            foreach (var slot in slots)
             {
                 if (_stop.IsCancellationRequested) break;
-                await TryAddAsync(transport, slot).ConfigureAwait(false);
+                if (_mice.TryGetValue((transport, slot), out var mouse))
+                {
+                    if (!mouse.Online) await OnLinkChangedAsync(transport, slot, true).ConfigureAwait(false);
+                }
+                else await TryAddAsync(transport, slot).ConfigureAwait(false);
             }
         }
 
-        if (opened.Count > 0) StateChanged?.Invoke();
+        if (opened.Count > 0) { ScanWindowsMice(); StateChanged?.Invoke(); }
     }
 
     private async Task TryAddAsync(HidppTransport transport, byte slot)
@@ -431,6 +477,7 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
         }
 
         lock (_transportSync) _transports.Remove(transport);
+        _identities.TryRemove(transport, out _);
         transport.Dispose();
         StateChanged?.Invoke();
         Rescan();

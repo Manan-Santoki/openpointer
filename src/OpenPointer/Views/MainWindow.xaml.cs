@@ -143,6 +143,7 @@ public partial class MainWindow : Window
     {
         var stack = new StackPanel();
         stack.Children.Add(Ui.Text(mouse?.Name ?? "No device", "Label"));
+        if (mouse != null) stack.ToolTip = mouse.Name;
         var status = mouse == null ? "Searching for mice…"
             : !mouse.Online ? "Asleep or out of range"
             : mouse.Battery is { } b ? $"{b.Percent}% · {b.Status}" : mouse.IsStandardMouse ? $"{mouse.WindowsDevice!.Connection} · standard support" : "Connected";

@@ -7,8 +7,11 @@ namespace OpenPointer.Platform;
 
 /// <summary>A standard mouse exposed by Windows, regardless of brand or connection.</summary>
 public sealed record WindowsMouseInfo(string DevicePath, string Name, int ButtonCount, string Connection,
-    int? VendorId = null, int? ProductId = null, int ButtonMask = -1)
+    int? VendorId = null, int? ProductId = null, int ButtonMask = -1, Guid? ContainerId = null)
 {
+    internal bool MatchesLogitechDevice(int productId, Guid? containerId) => VendorId == Hidpp.HidppTransport.VendorLogitech &&
+        ProductId == productId && (ContainerId == null || containerId == null || ContainerId == containerId);
+
     public IReadOnlyList<string> Buttons
     {
         get
@@ -69,6 +72,7 @@ public static class WindowsMouseDiscovery
         var haveReportedName = false;
         var bluetooth = path.Contains("BTH", StringComparison.OrdinalIgnoreCase);
         var usb = path.Contains("VID_", StringComparison.OrdinalIgnoreCase);
+        var builtIn = false;
         var instance = ReadInterfaceInstance(path);
         if (instance != null && CM_Locate_DevNodeW(out var node, instance, 0) == 0)
         {
@@ -76,23 +80,40 @@ public static class WindowsMouseDiscovery
             for (var depth = 0; depth < 5; depth++)
             {
                 var id = new StringBuilder(1024);
+                var nodeId = "";
                 if (CM_Get_Device_IDW(node, id, id.Capacity, 0) == 0)
                 {
-                    bluetooth |= id.ToString().StartsWith("BTH", StringComparison.OrdinalIgnoreCase);
-                    usb |= id.ToString().StartsWith("USB\\", StringComparison.OrdinalIgnoreCase);
+                    nodeId = id.ToString();
+                    bluetooth |= nodeId.StartsWith("BTH", StringComparison.OrdinalIgnoreCase);
+                    usb |= nodeId.StartsWith("USB\\", StringComparison.OrdinalIgnoreCase);
+                    builtIn |= nodeId.StartsWith("ACPI\\", StringComparison.OrdinalIgnoreCase);
                 }
 
                 var reported = ReadProperty(node, new(new Guid("540b947e-8b40-45bc-a8a2-6a0b894cbda2"), 4));
                 var friendly = ReadProperty(node, new(new Guid("a45c254e-df1c-4efd-8020-67d146a850e0"), 14));
                 if (!haveReportedName && !string.IsNullOrWhiteSpace(reported)) { name = reported; haveReportedName = true; }
-                if (!haveReportedName && !string.IsNullOrWhiteSpace(friendly)) name = friendly;
+                var remoteBluetoothDevice = nodeId.StartsWith("BTHLE\\DEV_", StringComparison.OrdinalIgnoreCase) ||
+                    nodeId.StartsWith("BTHENUM\\DEV_", StringComparison.OrdinalIgnoreCase);
+                if (!string.IsNullOrWhiteSpace(friendly) && (!haveReportedName || remoteBluetoothDevice)) name = friendly;
                 if (CM_Get_Parent(out var parent, node, 0) != 0) break;
                 node = parent;
             }
         }
 
-        return new(path, name, buttons, bluetooth ? "Bluetooth" : usb ? "USB / wireless receiver" : "Windows mouse",
-            ReadId(path, "VID"), ReadId(path, "PID"));
+        if (name == "Windows mouse" && builtIn) name = "Built-in pointing device";
+        return new(path, name, buttons, bluetooth ? "Bluetooth" : usb ? "USB / wireless receiver" : builtIn ? "Built-in" : "Windows mouse",
+            ReadId(path, "VID"), ReadId(path, "PID"), ContainerId: ReadContainerId(path));
+    }
+
+    internal static Guid? ReadContainerId(string path)
+    {
+        var instance = ReadInterfaceInstance(path);
+        if (instance == null || CM_Locate_DevNodeW(out var node, instance, 0) != 0) return null;
+        var key = new PropertyKey(new Guid("8c7ed206-3f8a-4827-b3ab-ae9e1faefc6c"), 2);
+        var data = new byte[16];
+        uint size = 16;
+        return CM_Get_DevNode_PropertyW(node, ref key, out var type, data, ref size, 0) == 0 && type == 13 && size == 16
+            ? new Guid(data) : null;
     }
 
     internal static int? ReadId(string path, string kind)
