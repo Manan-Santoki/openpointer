@@ -20,8 +20,19 @@ public sealed class ButtonsPage(MainWindow window) : IPage
         var mouse = Services.SelectedMouse;
 
         var page = new StackPanel();
-        page.Children.Add(PageHeader.Create("Buttons", "Choose what each button does. App profiles override All applications."));
+        var touchpad = mouse?.WindowsDevice?.IsTouchpad == true;
+        page.Children.Add(touchpad
+            ? PageHeader.Create("Touchpad gestures", "Give corners, edges, circles and multi-finger gestures an action. Gestures Windows already uses stay with Windows.")
+            : PageHeader.Create("Buttons", "Choose what each button does. App profiles override All applications."));
         page.Children.Add(ProfileSelector(config, profile));
+        if (touchpad)
+        {
+            foreach (var element in TouchpadView.Create(config, profile, isDefault, Assign)) page.Children.Add(element);
+            var saveNote = Ui.Text("Save to apply your changes. Touchpad gestures follow the same app profiles as buttons.", "Caption");
+            saveNote.TextWrapping = TextWrapping.Wrap;
+            page.Children.Add(saveNote);
+            return page;
+        }
 
         if (mouse == null)
         {

@@ -86,7 +86,8 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
     {
         if (!_passive)
         {
-            var hook = new WindowsMouseHook(new WindowsMouseRouter(ResolveWindowsButton, OnWindowsInput),
+            _router = new WindowsMouseRouter(ResolveWindowsButton, OnWindowsInput);
+            var hook = new WindowsMouseHook(_router,
                 (path, button) => QueueAction(() => OnWindowsButtonSeen(path, button)));
             try
             {
@@ -95,9 +96,135 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
                 Log.Info($"Windows mouse remapping started (shared standard button mappings; per-mouse button detection {(hook.ObservesDevices ? "on" : "off")})");
             }
             catch (Exception ex) { hook.Dispose(); Log.Error("Starting Windows mouse remapping", ex); }
+            StartTouchpad();
         }
         _ = Task.Run(MonitorLoopAsync);
     }
+
+    private WindowsMouseRouter? _router;
+    private TouchpadMonitor? _touchpad;
+    private readonly TouchpadRecognizer _recognizer = new();
+    private ConnectedMouse? _touchpadMouse;
+    private (int X, int Y) _touchCursor;
+    private WindowsTouchpadSettings _touchpadSettings = WindowsTouchpadSettings.Default;
+    private long _touchpadSettingsRead = long.MinValue / 2;
+
+    /// <summary>The precision touchpad's physical size, once its first report arrives.</summary>
+    public (double Width, double Height)? TouchpadSize { get; private set; }
+
+    public bool HasTouchpad => _touchpadMouse != null;
+
+    /// <summary>Raised on the touchpad thread for every frame; the Touchpad page draws the fingers.</summary>
+    public event Action<TouchFrame>? TouchpadFrame;
+
+    /// <summary>Raised when a touchpad gesture runs its action.</summary>
+    public event Action<string>? TouchpadGestureFired;
+
+    /// <summary>The user's Windows touchpad gesture settings, re-read at most every few seconds.</summary>
+    public WindowsTouchpadSettings TouchpadSettings
+    {
+        get
+        {
+            if (Environment.TickCount64 - _touchpadSettingsRead > 3000)
+            {
+                _touchpadSettings = WindowsTouchpadSettings.Read();
+                _touchpadSettingsRead = Environment.TickCount64;
+            }
+            return _touchpadSettings;
+        }
+    }
+
+    private void StartTouchpad()
+    {
+        var monitor = new TouchpadMonitor();
+        monitor.DeviceFound += (path, _, size) =>
+        {
+            TouchpadSize = size;
+            if (size is { Width: > 0, Height: > 0 } s) _recognizer.Aspect = s.Width / s.Height;
+            _touchpadMouse = new ConnectedMouse(new WindowsMouseInfo(path, "Touchpad", 0, "Built-in", IsTouchpad: true));
+            Log.Info($"Precision touchpad found{(size is { } m ? $" ({m.Width:F0} x {m.Height:F0} mm)" : "")}");
+            StateChanged?.Invoke();
+        };
+        monitor.Frame += frame =>
+        {
+            TouchpadFrame?.Invoke(frame);
+            _recognizer.Feed(frame.Contacts, frame.Tick, frame.ButtonDown);
+            if (_pointerHeld) _router?.HoldPointerUntil(Environment.TickCount64 + 250);
+        };
+        _recognizer.TouchStarted += () =>
+        {
+            _touchId++;
+            GetCursorPos(out var cursor);
+            _touchCursor = (cursor.X, cursor.Y);
+            var settings = TouchpadSettings;
+            _recognizer.CornersNeedHold = settings.CornersNeedHold;
+            _recognizer.Active = ActiveGestures(settings);
+        };
+        _recognizer.PointerLock += on =>
+        {
+            _pointerHeld = on;
+            if (_router == null) return;
+            _router.HoldPointerUntil(on ? Environment.TickCount64 + 250 : 0);
+            // The finger moved the pointer before the gesture was recognized; put it back.
+            if (on) SetCursorPos(_touchCursor.X, _touchCursor.Y);
+        };
+        _recognizer.Fired += key =>
+        {
+            var touch = _touchId;
+            QueueAction(() => OnTouchpadGesture(key, touch));
+        };
+        try
+        {
+            monitor.Start();
+            _touchpad = monitor;
+        }
+        catch (Exception ex) { monitor.Dispose(); Log.Error("Starting touchpad input", ex); }
+    }
+
+    /// <summary>Gestures with an action in the focused app that Windows doesn't already use.</summary>
+    private HashSet<string> ActiveGestures(WindowsTouchpadSettings settings)
+    {
+        var config = _config.Current;
+        if (_paused || !config.General.DeveloperMode || !config.General.ShowTouchpads) return [];
+        var context = FocusTracker.Snapshot();
+        return TouchpadGestures.All.Where(g => settings.Owner(g.Key) == null &&
+            ContextMatcher.ResolveButton(config, context, g.Key) is not (NativeAction or NoneAction)).Select(g => g.Key).ToHashSet();
+    }
+
+    private int _touchId;
+    private volatile bool _pointerHeld;
+    private (int Touch, Dictionary<string, (int Count, long Last)> Keys) _firedInTouch = (-1, []);
+
+    /// <summary>Fastest a repeating gesture runs its action, and the most times one touch may run it.</summary>
+    internal const int RepeatIntervalMs = 80, MaxRepeatsPerTouch = 40;
+
+    /// <summary>Whether a gesture may run its action again in the same touch.</summary>
+    internal static bool MayRepeat(ActionSpec action, int count, long sinceLast) =>
+        count == 0 || action is (KeysAction or ScrollAction) && count < MaxRepeatsPerTouch && sinceLast >= RepeatIntervalMs;
+
+    private void OnTouchpadGesture(string key, int touch)
+    {
+        if (_touchpadMouse is not { } mouse || TouchpadSettings.Owner(key) != null) return;
+        var action = ContextMatcher.ResolveButton(_config.Current, FocusTracker.Snapshot(), key);
+        if (action is NativeAction or NoneAction) return;
+        // Edge slides and circles repeat; that suits keys (volume, brightness) and scrolling, but an
+        // app, macro or typed text runs once per touch.
+        if (_firedInTouch.Touch != touch) _firedInTouch = (touch, []);
+        var now = Environment.TickCount64;
+        var (count, last) = _firedInTouch.Keys.GetValueOrDefault(key);
+        if (!MayRepeat(action, count, now - last)) return;
+        _firedInTouch.Keys[key] = (count + 1, now);
+        LogPress(TouchpadGestures.Find(key) is { } gesture ? $"Touchpad {gesture.Group.ToLowerInvariant()}: {gesture.Label.ToLowerInvariant()}" : key, 1, action);
+        Runner.Fire(mouse, action);
+        TouchpadGestureFired?.Invoke(key);
+    }
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct CursorPoint { public int X, Y; }
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool GetCursorPos(out CursorPoint point);
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool SetCursorPos(int x, int y);
 
     private WindowsButtonBinding? ResolveWindowsButton(ushort cid)
     {
@@ -779,6 +906,8 @@ public sealed class DeviceManager : IDeviceControl, IDisposable
         _stop.Cancel();
         _windowsHook?.Dispose();
         _windowsHook = null;
+        _touchpad?.Dispose();
+        _touchpad = null;
         foreach (var mouse in Mice) QueueAction(() => CancelActions(mouse));
         RestoreDevices();
         _actionQueue.CompleteAdding();

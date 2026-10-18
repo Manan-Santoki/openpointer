@@ -40,6 +40,16 @@ public static class DocsCapture
             Save(window, Path.Combine(directory, file + ".png"));
         }
 
+        // Touchpad gestures, when a touchpad is shown (Developer mode → Show touchpads).
+        if (devices.Mice.FirstOrDefault(m => m.WindowsDevice?.IsTouchpad == true) is { } touchpad)
+        {
+            Services.SelectedMouse = touchpad;
+            window.Navigate("Buttons");
+            await Task.Delay(500);
+            Save(window, Path.Combine(directory, "touchpad.png"));
+            Services.SelectedMouse = null;
+        }
+
         // A dialog, for checking modal layout.
         if (CursorManager.Packs.FirstOrDefault() is { } pack)
         {

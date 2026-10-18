@@ -21,7 +21,8 @@ public sealed class CursorsPage(MainWindow window) : IPage
         var page = new StackPanel();
         page.Children.Add(PageHeader.Create("Cursors", "Pick a pointer style for all of Windows, then save to apply it."));
 
-        var cards = new WrapPanel { Margin = new Thickness(0, 0, -16, 8) };
+        // Two equal columns that fill the page, so the cards line up with the full-width card below.
+        var cards = new System.Windows.Controls.Primitives.UniformGrid { Columns = 2, Margin = new Thickness(0, 0, -16, 8) };
         cards.Children.Add(StyleCard(null, general));
         foreach (var pack in CursorManager.Packs) cards.Children.Add(StyleCard(pack, general));
         page.Children.Add(cards);
@@ -91,7 +92,6 @@ public sealed class CursorsPage(MainWindow window) : IPage
         var card = new Border
         {
             Style = Ui.Style("Card"),
-            Width = 320,
             Padding = new Thickness(14),
             Margin = new Thickness(0, 0, 16, 16),
             Child = body,

@@ -1,0 +1,29 @@
+{
+  "id": "windows11-concept-light",
+  "name": "Windows 11 Concept (light)",
+  "description": "Light pointers in the style of Windows 11",
+  "author": "Jepri Creations",
+  "source": "https://www.deviantart.com/jepricreations",
+  "license": "Free to share with credit",
+  "licenseFile": "LICENSE.txt",
+  "path": "",
+  "roles": {
+    "Arrow": "arrow.cur",
+    "Help": "help.cur",
+    "AppStarting": "appstarting.ani",
+    "Wait": "wait.ani",
+    "Crosshair": "crosshair.cur",
+    "IBeam": "ibeam.cur",
+    "NWPen": "nwpen.cur",
+    "No": "no.cur",
+    "SizeNS": "sizens.cur",
+    "SizeWE": "sizewe.cur",
+    "SizeNWSE": "sizenwse.cur",
+    "SizeNESW": "sizenesw.cur",
+    "SizeAll": "sizeall.cur",
+    "UpArrow": "uparrow.cur",
+    "Hand": "hand.cur",
+    "Pin": "pin.cur",
+    "Person": "person.cur"
+  }
+}

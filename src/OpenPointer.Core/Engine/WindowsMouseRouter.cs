@@ -34,6 +34,14 @@ internal sealed class WindowsMouseRouter(Func<ushort, WindowsButtonBinding?> res
 {
     private readonly Dictionary<ushort, WindowsButtonBinding?> _held = [];
     private int _anchorX, _anchorY;
+    private long _holdUntil;
+
+    /// <summary>
+    /// Freezes the pointer until the given tick while a one-finger touchpad gesture owns the finger.
+    /// The caller keeps extending it while the finger moves, so the pointer always frees itself
+    /// shortly after touchpad input stops, even if the release is never seen.
+    /// </summary>
+    public void HoldPointerUntil(long tick) => Interlocked.Exchange(ref _holdUntil, tick);
 
     public bool Process(int message, uint data, int x, int y, uint flags = 0, nint extraInfo = 0)
     {
@@ -41,6 +49,7 @@ internal sealed class WindowsMouseRouter(Func<ushort, WindowsButtonBinding?> res
         if ((flags & 3) != 0 || extraInfo == InputSynth.Signature) return false;
         if (message == 0x0200)
         {
+            if (Environment.TickCount64 < Interlocked.Read(ref _holdUntil)) return true;
             var owners = _held.Values.Where(b => b is { CapturesMovement: true }).Select(b => b!.Mouse).Distinct().ToArray();
             if (owners.Length == 0) return false;
             foreach (var owner in owners) dispatch(new WindowsMouseEvent.Move(owner, x - _anchorX, y - _anchorY));

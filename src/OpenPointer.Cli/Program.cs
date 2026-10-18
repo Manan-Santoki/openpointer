@@ -5,7 +5,29 @@
 //   openpointer-cli listen [cid...]   divert controls (hex CIDs, default: all divertable) and print events
 //   openpointer-cli dpi <value>       set DPI
 
+//   openpointer-cli touchpad [secs]   print precision touchpad contacts (0..1 from the top-left)
+
 var command = args.Length > 0 ? args[0] : "dump";
+if (command == "touchpad")
+{
+    using var touchpad = new OpenPointer.Platform.TouchpadMonitor();
+    touchpad.DeviceFound += (path, contacts, size) =>
+        Console.WriteLine($"Touchpad {path}: {contacts} contacts, {(size is { } s ? $"{s.Width:F0} x {s.Height:F0} mm" : "size not reported")}");
+    var last = "";
+    touchpad.Frame += frame =>
+    {
+        var line = string.Join("  ", frame.Contacts.Where(c => c.Touching)
+            .Select(c => $"{c.Id}:{c.X:F2},{c.Y:F2}{(c.Confident ? "" : " palm")}")) + (frame.ButtonDown ? "  [click]" : "");
+        if (line == last) return;
+        last = line;
+        Console.WriteLine($"{frame.Tick % 100000,6} {line}");
+    };
+    touchpad.Start();
+    var seconds = args.Length > 1 ? int.Parse(args[1]) : 0;
+    Console.WriteLine(seconds > 0 ? $"Recording for {seconds} s." : "Touch the pad. Press Enter to stop.");
+    if (seconds > 0) Thread.Sleep(seconds * 1000); else Console.ReadLine();
+    return 0;
+}
 var windowsMice = OpenPointer.Platform.WindowsMouseDiscovery.Enumerate();
 Console.WriteLine($"Windows mice: {windowsMice.Count}");
 foreach (var mouse in windowsMice)

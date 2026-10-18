@@ -6,6 +6,18 @@ Each release's notes on GitHub are taken from its section here, so add an entry 
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-17
+
+### Added
+- **Touchpad gestures** for precision touchpads. Select your touchpad under Devices (Settings → Developer mode → Show touchpads) to see a live drawing of it and give gestures an action, per app like buttons:
+  - Touch and hold (or tap, when Windows tap to click is off) a corner.
+  - Slide along an edge; the action repeats as you slide, which makes edges good volume or brightness sliders.
+  - Swipe in from an edge.
+  - Draw a circle, clockwise or counterclockwise; the action repeats every full turn.
+  - Three- and four-finger swipes and taps, and a five-finger tap.
+- OpenPointer never changes your Windows touchpad settings. Gestures Windows already uses are shown as Windows' and locked; set one to Nothing in Windows touchpad settings to use it in OpenPointer.
+- openpointer-cli touchpad prints live finger positions.
+
 ## [0.8.2] - 2026-10-17
 
 ### Fixed
@@ -175,7 +187,8 @@ First build (not published as a release).
 [Unreleased]: https://github.com/Manan-Santoki/openpointer/compare/v0.8.1...HEAD
 [0.8.1]: https://github.com/Manan-Santoki/openpointer/compare/v0.7.0...v0.8.1
 [0.7.0]: https://github.com/Manan-Santoki/openpointer/compare/v0.6.0...v0.7.0
-[Unreleased]: https://github.com/Manan-Santoki/openpointer/compare/v0.8.2...HEAD
+[Unreleased]: https://github.com/Manan-Santoki/openpointer/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/Manan-Santoki/openpointer/compare/v0.8.2...v0.9.0
 [0.8.2]: https://github.com/Manan-Santoki/openpointer/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/Manan-Santoki/openpointer/compare/v0.7.0...v0.8.1
 [0.7.0]: https://github.com/Manan-Santoki/openpointer/compare/v0.6.0...v0.7.0

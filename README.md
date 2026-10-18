@@ -19,7 +19,7 @@ It can:
 - repeat keys like volume and arrows while the button is held
 - do gestures, and show an Actions Ring (hold a button, aim at an action, release)
 - change DPI, scroll speed, SmartShift and the thumb wheel, if your mouse has them
-- switch Windows cursors between the default set and a macOS set
+- switch Windows cursors between the default set, a macOS set and Windows 11 Concept (dark or light)
 - show battery level in the tray and warn when it's low
 
 ## Install
@@ -68,6 +68,6 @@ Bug reports, device reports and pull requests are welcome. See [CONTRIBUTING.md]
 
 ## License
 
-MIT. The macOS cursors are by [antiden](https://github.com/antiden/macOS-cursors-for-Windows) (MIT), and the Geist font is under the SIL Open Font License.
+MIT. The macOS cursors are by [antiden](https://github.com/antiden/macOS-cursors-for-Windows) (MIT), the Windows 11 Concept cursors are by [Jepri Creations](https://www.deviantart.com/jepricreations) (free to share with credit; [source](https://github.com/ShumTin/Windows-11-Cursors-Concept-v2)), and the Geist font is under the SIL Open Font License.
 
 OpenPointer isn't affiliated with Logitech.

@@ -323,7 +323,13 @@ public sealed class ActionRunner
                     InputSynth.TypeText(text.Text);
                     break;
                 case MacroAction macro:
-                    _ = Task.Run(() => RunMacroAsync(mouse, macro));
+                    // One run of a macro at a time, however fast it is triggered.
+                    lock (_runningMacros) { if (!_runningMacros.Add(macro)) break; }
+                    _ = Task.Run(async () =>
+                    {
+                        try { await RunMacroAsync(mouse, macro).ConfigureAwait(false); }
+                        finally { lock (_runningMacros) _runningMacros.Remove(macro); }
+                    });
                     break;
                 case GestureAction g:
                     if (g.Tap != null) Fire(mouse, g.Tap);
@@ -376,8 +382,26 @@ public sealed class ActionRunner
         }
     }
 
+    private readonly HashSet<MacroAction> _runningMacros = new(ReferenceEqualityComparer.Instance);
+    private static readonly Dictionary<string, long> LastLaunch = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Opening the same app or page again within a second is never intended (a repeating gesture,
+    /// a bouncing button), and a burst of launches can overwhelm the PC, so repeats are dropped.
+    /// </summary>
+    internal static bool LaunchAllowed(string target, long now)
+    {
+        lock (LastLaunch)
+        {
+            if (LastLaunch.TryGetValue(target, out var last) && now - last < 1000) return false;
+            LastLaunch[target] = now;
+            return true;
+        }
+    }
+
     private static void Launch(LaunchAction launch)
     {
+        if (!LaunchAllowed(launch.Target, Environment.TickCount64)) return;
         var target = Environment.ExpandEnvironmentVariables(launch.Target);
         // Start menu apps (including Microsoft Store apps) launch through the shell by app ID,
         // which keeps working when the app updates and its install folder changes.
