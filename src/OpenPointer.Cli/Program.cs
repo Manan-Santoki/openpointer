@@ -1,4 +1,4 @@
-﻿using OpenPointer.Hidpp;
+using OpenPointer.Hidpp;
 
 // Diagnostics for the HID++ layer. Logi Options+ must not be running, or it will fight over the device.
 //   openpointer-cli dump              identity, features, controls, DPI, SmartShift, battery
@@ -8,6 +8,29 @@
 //   openpointer-cli touchpad [secs]   print precision touchpad contacts (0..1 from the top-left)
 
 var command = args.Length > 0 ? args[0] : "dump";
+if (command == "touchpad-replay")
+{
+    // Replays a "touchpad" recording through the gesture recognizer with every gesture assigned.
+    var invariant = System.Globalization.CultureInfo.InvariantCulture;
+    var recognizer = new OpenPointer.Engine.TouchpadRecognizer
+    {
+        Aspect = args.Length > 2 ? double.Parse(args[2], invariant) : 117 / 72.0,
+        Active = OpenPointer.Config.TouchpadGestures.All.Select(g => g.Key).ToHashSet(),
+    };
+    long at = 0;
+    recognizer.Fired += key => Console.WriteLine($"{at,6} {key}");
+    foreach (var line in File.ReadLines(args[1]))
+    {
+        var match = System.Text.RegularExpressions.Regex.Match(line, @"^\s*(\d+)\s*(.*)$");
+        if (!match.Success) continue;
+        at = long.Parse(match.Groups[1].Value);
+        var contacts = System.Text.RegularExpressions.Regex.Matches(match.Groups[2].Value, @"(\d):([\d.]+),([\d.]+)( palm)?")
+            .Select(m => new OpenPointer.Platform.TouchContact(int.Parse(m.Groups[1].Value), double.Parse(m.Groups[2].Value, invariant),
+                double.Parse(m.Groups[3].Value, invariant), true, !m.Groups[4].Success)).ToList();
+        recognizer.Feed(contacts, at, match.Groups[2].Value.Contains("[click]"));
+    }
+    return 0;
+}
 if (command == "touchpad")
 {
     using var touchpad = new OpenPointer.Platform.TouchpadMonitor();

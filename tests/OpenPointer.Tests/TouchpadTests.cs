@@ -98,6 +98,21 @@ public class TouchpadRecognizerTests
         Assert.Empty(fired);
     }
 
+    [Theory]
+    [InlineData(0.04, 1.0)] // a tiny jiggle that turns a lot
+    [InlineData(0.15, 0.2)] // a flat zigzag: wide but squashed
+    public void SmallOrFlatLoopsAreNotCircles(double radius, double squash)
+    {
+        var (recognizer, fired, locks) = Create("circle-cw", "circle-ccw");
+        Play(recognizer, Enumerable.Range(0, 72 * 4).Select(i =>
+        {
+            var angle = i * 2 * Math.PI / 72;
+            return new[] { (0.5 + radius * Math.Cos(angle) / 1.6, 0.5 + radius * squash * Math.Sin(angle)) };
+        }));
+        Assert.Empty(fired);
+        Assert.Empty(locks);
+    }
+
     [Fact]
     public void MultiFingerSwipesAndTaps()
     {

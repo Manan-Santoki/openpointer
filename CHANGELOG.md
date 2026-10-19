@@ -6,6 +6,14 @@ Each release's notes on GitHub are taken from its section here, so add an entry 
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-10-18
+
+### Fixed
+- Drawing a circle on the touchpad no longer triggers from small wiggles or zigzags. A circle must be at least about 15 mm across and roughly round, and sensor jitter is ignored.
+
+### Added
+- `openpointer-cli touchpad-replay` replays a touchpad recording through the gesture recognizer.
+
 ## [0.9.0] - 2026-10-17
 
 ### Added
@@ -187,7 +195,8 @@ First build (not published as a release).
 [Unreleased]: https://github.com/Manan-Santoki/openpointer/compare/v0.8.1...HEAD
 [0.8.1]: https://github.com/Manan-Santoki/openpointer/compare/v0.7.0...v0.8.1
 [0.7.0]: https://github.com/Manan-Santoki/openpointer/compare/v0.6.0...v0.7.0
-[Unreleased]: https://github.com/Manan-Santoki/openpointer/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/Manan-Santoki/openpointer/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/Manan-Santoki/openpointer/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/Manan-Santoki/openpointer/compare/v0.8.2...v0.9.0
 [0.8.2]: https://github.com/Manan-Santoki/openpointer/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/Manan-Santoki/openpointer/compare/v0.7.0...v0.8.1

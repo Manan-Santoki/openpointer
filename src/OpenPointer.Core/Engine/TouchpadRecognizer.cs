@@ -14,6 +14,11 @@ internal sealed class TouchpadRecognizer
     internal const double CornerX = TouchpadGestures.CornerX, CornerY = TouchpadGestures.CornerY, EdgeBand = TouchpadGestures.EdgeBand, EdgeKeep = 0.16, EdgeStep = 0.08, SwipeIn = 0.25,
         Still = 0.03, MultiSwipe = 0.2;
     internal const int CircleTurns = 2;
+    /// <summary>
+    /// A circle must span at least this many pad heights each way (about 15 mm on a typical pad) and
+    /// be roughly round; tiny jiggles and flat zigzags turn just as much but are not circles.
+    /// </summary>
+    internal const double MinCircle = 0.2, MaxCircleStretch = 2.5, HeadingStep = 0.012;
     internal const int TapMs = 250, HoldMs = 450, SwipeInMs = 350;
 
     private enum Mode { Undecided, Edge, Circle, Done, Ignored }
@@ -24,6 +29,7 @@ internal sealed class TouchpadRecognizer
     private (double X, double Y) _first, _last, _anchor, _centroidStart, _centroid;
     private double _heading, _turn;
     private bool _hasHeading, _locked;
+    private (double MinX, double MinY, double MaxX, double MaxY) _box;
     private string? _edge;
 
     /// <summary>Gesture keys with an action in the focused app; nothing else is recognized.</summary>
@@ -62,6 +68,7 @@ internal sealed class TouchpadRecognizer
             _first = _last = _anchor = points[0];
             _centroidStart = _centroid = centroid;
             _turn = 0;
+            _box = (points[0].X, points[0].Y, points[0].X, points[0].Y);
             _hasHeading = false;
             _edge = null;
             TouchStarted?.Invoke();
@@ -86,7 +93,9 @@ internal sealed class TouchpadRecognizer
     {
         var moved = Distance(point, _first);
         var step = Distance(point, _last);
-        if (step > 0.004)
+        _box = (Math.Min(_box.MinX, point.X), Math.Min(_box.MinY, point.Y), Math.Max(_box.MaxX, point.X), Math.Max(_box.MaxY, point.Y));
+        // Ignore sensor jitter: only steps of about a millimetre change the heading.
+        if (step > HeadingStep)
         {
             var heading = Math.Atan2(point.Y - _last.Y, point.X - _last.X);
             if (_hasHeading) _turn += Wrap(heading - _heading);
@@ -154,11 +163,22 @@ internal sealed class TouchpadRecognizer
         var needed = 2 * Math.PI * (_locked ? 0.92 : CircleTurns - 0.08);
         while (Math.Abs(_turn) >= needed)
         {
+            var width = _box.MaxX - _box.MinX;
+            var height = _box.MaxY - _box.MinY;
+            if (Math.Min(width, height) < MinCircle || Math.Max(width, height) > MaxCircleStretch * Math.Min(width, height))
+            {
+                // Turned a lot without drawing a real circle: start counting again from here.
+                _turn = 0;
+                _box = (_last.X, _last.Y, _last.X, _last.Y);
+                return;
+            }
+
             var key = TouchpadGestures.Key(_turn > 0 ? "circle-cw" : "circle-ccw");
             if (!Active.Contains(key)) { _mode = Mode.Ignored; return; }
             _turn -= Math.Sign(_turn) * 2 * Math.PI * (_locked ? 1 : CircleTurns);
             Lock(true);
             Fire(key);
+            _box = (_last.X, _last.Y, _last.X, _last.Y); // each further turn must be a real circle too
             needed = 2 * Math.PI * 0.92;
         }
     }
