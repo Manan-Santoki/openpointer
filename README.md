@@ -8,8 +8,11 @@ OpenPointer is an open-source mouse customization app for Windows. Remap buttons
 I started it because I wanted the side buttons on my mouse to do different things on the desktop than in File Explorer, and to keep changing the volume while I hold a button.
 
 <p align="center">
-  <img src="docs/screenshots/buttons.png" width="49%" />
-  <img src="docs/screenshots/cursors.png" width="49%" />
+  <img src="docs/screenshots/buttons.png" alt="Button mappings with double and triple press actions" width="49%" />
+  <img src="docs/screenshots/cursors.png" alt="Windows, macOS and Windows 11 Concept cursor styles" width="49%" />
+</p>
+<p align="center">
+  <img src="docs/screenshots/applications.png" alt="Application profiles for Desktop, Spotify and Google Chrome" width="49%" />
 </p>
 
 It can:
